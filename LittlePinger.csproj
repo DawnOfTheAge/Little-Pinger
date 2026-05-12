@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>LittlePinger</RootNamespace>
+    <AssemblyName>LittlePinger</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Resources\Little Pinger.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Embed the icon as a WPF pack resource so Window.Icon can resolve it -->
+    <Resource Include="Resources\Little Pinger.ico"/>
+  </ItemGroup>
+</Project>

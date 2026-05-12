@@ -1,0 +1,11 @@
+<UserControl x:Class="LittlePinger.PingGraphControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Border Background="#111A20" BorderBrush="#37474F" BorderThickness="1" CornerRadius="4">
+        <Canvas x:Name="GraphCanvas">
+            <Polyline x:Name="GraphLine"
+                      Stroke="#80CBC4" StrokeThickness="1.5"
+                      StrokeLineJoin="Round" Points=""/>
+        </Canvas>
+    </Border>
+</UserControl>

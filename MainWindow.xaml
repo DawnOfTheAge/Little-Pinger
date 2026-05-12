@@ -1,0 +1,2635 @@
+<Window x:Class="LittlePinger.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:conv="clr-namespace:LittlePinger.Converters"
+        xmlns:vm="clr-namespace:LittlePinger.ViewModels"
+        xmlns:local="clr-namespace:LittlePinger"
+        x:Name="RootWindow"
+        Title="Little Pinger"
+        Icon="Resources/Little Pinger.ico"
+        Height="580" Width="1100"
+        MinHeight="440" MinWidth="820"
+        Background="#F5F5F5">
+
+    <Window.InputBindings>
+        <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding AddCommand}"/>
+        <KeyBinding Key="Delete" Command="{Binding RemoveCommand}"/>
+        <KeyBinding Key="F2" Command="{Binding EditCommand}"/>
+    </Window.InputBindings>
+
+    <Window.Resources>
+        <conv:PingStatusToColorConverter   x:Key="StatusToColor"/>
+        <conv:BoolToStartStopTextConverter x:Key="BoolToToggleText"/>
+        <conv:BoolToRunningBrushConverter  x:Key="BoolToToggleBrush"/>
+        <conv:BoolToVisibilityConverter    x:Key="BoolToVis"/>
+
+        <DropShadowEffect x:Key="DropShadow"
+                          BlurRadius="8"
+                          ShadowDepth="2"
+                          Direction="270"
+                          Color="#90000000"
+                          Opacity="0.25"/>
+
+        <!-- TabControl: custom template so the tab strip sits flush at the top -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="#F5F5F5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#455A64">
+                                <TabPanel IsItemsHost="True" Background="Transparent"/>
+                            </Border>
+                            <Border Grid.Row="1" Background="{TemplateBinding Background}">
+                                <ContentPresenter ContentSource="SelectedContent"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- TabItem -->
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="#B0BEC5"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="tabBorder"
+                                Background="Transparent"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="tabBorder" Property="Background" Value="#37474F"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="tabBorder" Property="Background" Value="#546E7A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DataGrid column header -->
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#37474F"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="8,0"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="BorderBrush" Value="#546E7A"/>
+            <Setter Property="BorderThickness" Value="0,0,1,0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        </Style>
+
+        <!-- DataGrid cell -->
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Padding="8,0"
+                                Background="{TemplateBinding Background}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#BBDEFB"/>
+                    <Setter Property="Foreground" Value="#1A237E"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- DataGrid row -->
+        <Style TargetType="DataGridRow">
+            <Setter Property="Height" Value="34"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#E8F5E9"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#BBDEFB"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- ── Inner (nested) TabControl — used by Connectivity &amp; Reachability tab ── -->
+        <Style x:Key="InnerTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="#F5F5F5"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Background="#546E7A">
+                                <TabPanel IsItemsHost="True" Background="Transparent"/>
+                            </Border>
+                            <Border Grid.Row="1" Background="{TemplateBinding Background}">
+                                <ContentPresenter ContentSource="SelectedContent"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Inner TabItem style -->
+        <Style x:Key="InnerTabItem" TargetType="TabItem">
+            <Setter Property="Foreground" Value="#CFD8DC"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="ib" Background="Transparent" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ib" Property="Background" Value="#455A64"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ib" Property="Background" Value="#607D8B"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- ── Dropdown ToggleButton (used by port picker) ── -->
+        <Style x:Key="DropdownToggleButton" TargetType="ToggleButton">
+            <Setter Property="Foreground"      Value="White"/>
+            <Setter Property="Background"      Value="#37474F"/>
+            <Setter Property="BorderBrush"     Value="#546E7A"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding"         Value="8,5"/>
+            <Setter Property="Cursor"          Value="Hand"/>
+            <Setter Property="FontSize"        Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#546E7A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <TabControl>
+
+        <!-- ═══════════════════════════ Ping Tab ════════════════════════════ -->
+        <TabItem Header="🏓  Ping">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- toolbar -->
+                    <RowDefinition Height="*"/>      <!-- grid -->
+                    <RowDefinition Height="Auto"/>   <!-- status bar -->
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0"
+                        Background="#455A64"
+                        Padding="8,6">
+                    <StackPanel Orientation="Horizontal">
+
+                        <Button Content="➕  Add"
+                                Command="{Binding AddCommand}"
+                                Background="#1E88E5"
+                                Padding="12,5" Margin="0,0,4,0"
+                                ToolTip="Add new entry  (Ctrl+N)"
+                                Style="{StaticResource ActionButton}"/>
+
+                        <Button Content="✏  Edit"
+                                Command="{Binding EditCommand}"
+                                Background="#039BE5"
+                                Padding="12,5" Margin="0,0,4,0"
+                                ToolTip="Edit selected entry  (F2)"
+                                Style="{StaticResource ActionButton}"/>
+
+                        <Separator Background="#607D8B" Width="1" Margin="6,2"/>
+
+                        <Button Content="✕  Remove"
+                                Command="{Binding RemoveCommand}"
+                                Background="#E53935"
+                                Padding="12,5" Margin="4,0,4,0"
+                                ToolTip="Remove selected entry  (Del)"
+                                Style="{StaticResource ActionButton}"/>
+
+                        <Button Content="✕  Remove All"
+                                Command="{Binding RemoveAllCommand}"
+                                Background="#C62828"
+                                Padding="12,5" Margin="0,0,4,0"
+                                ToolTip="Remove all entries"
+                                Style="{StaticResource ActionButton}"/>
+
+                        <Separator Background="#607D8B" Width="1" Margin="6,2"/>
+
+                        <Button Content="▶  Start All"
+                                Command="{Binding StartAllCommand}"
+                                Background="#43A047"
+                                Padding="12,5" Margin="4,0,4,0"
+                                ToolTip="Start pinging all entries"
+                                Style="{StaticResource ActionButton}"/>
+
+                        <Button Content="⏹  Stop All"
+                                Command="{Binding StopAllCommand}"
+                                Background="#FB8C00"
+                                Padding="12,5" Margin="0,0,0,0"
+                                ToolTip="Stop all pings"
+                                Style="{StaticResource ActionButton}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- DataGrid -->
+                <DataGrid Grid.Row="1"
+                          x:Name="MainGrid"
+                          ItemsSource="{Binding Entries}"
+                          SelectedItem="{Binding SelectedEntry}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E0E0E0"
+                          RowBackground="White"
+                          AlternatingRowBackground="#FAFAFA"
+                          CanUserResizeRows="False"
+                          CanUserReorderColumns="False"
+                          BorderThickness="0"
+                          HeadersVisibility="Column"
+                          VerticalScrollBarVisibility="Auto"
+                          MouseDoubleClick="MainGrid_MouseDoubleClick">
+
+                    <DataGrid.Columns>
+
+                        <!-- Status indicator -->
+                        <DataGridTemplateColumn Width="36" CanUserSort="False" CanUserResize="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Ellipse Width="14" Height="14"
+                                             HorizontalAlignment="Center"
+                                             Fill="{Binding Status, Converter={StaticResource StatusToColor}}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="IP / Host"
+                                            Binding="{Binding IpAddress}"
+                                            Width="140" MinWidth="100"/>
+
+                        <DataGridTextColumn Header="Name"
+                                            Binding="{Binding Name}"
+                                            Width="*" MinWidth="100"/>
+
+                        <DataGridTextColumn Header="Interval (ms)"
+                                            Binding="{Binding Interval}"
+                                            Width="95"/>
+
+                        <DataGridTextColumn Header="Timeout (ms)"
+                                            Binding="{Binding Timeout}"
+                                            Width="95"/>
+
+                        <DataGridTextColumn Header="Last RTT"
+                                            Binding="{Binding LastRttDisplay}"
+                                            Width="82"/>
+
+                        <DataGridTextColumn Header="Sent"
+                                            Binding="{Binding SentCount}"
+                                            Width="60"/>
+
+                        <DataGridTextColumn Header="Success"
+                                            Binding="{Binding SuccessCount}"
+                                            Width="68"/>
+
+                        <DataGridTextColumn Header="Failed"
+                                            Binding="{Binding FailCount}"
+                                            Width="62"/>
+
+                        <!-- Per-row Start / Stop toggle -->
+                        <DataGridTemplateColumn Header="Control" Width="90" CanUserSort="False" CanUserResize="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Button Command="{Binding ToggleCommand}"
+                                            Content="{Binding IsRunning, Converter={StaticResource BoolToToggleText}}"
+                                            Background="{Binding IsRunning, Converter={StaticResource BoolToToggleBrush}}"
+                                            Foreground="White"
+                                            Margin="4,3" Padding="4,2"
+                                            FontSize="11"
+                                            Style="{StaticResource ActionButton}"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <!-- Status bar -->
+                <Border Grid.Row="2"
+                        Background="#ECEFF1"
+                        BorderBrush="#CFD8DC"
+                        BorderThickness="0,1,0,0"
+                        Padding="12,5">
+                    <TextBlock Text="{Binding StatusText}"
+                               Foreground="#546E7A"
+                               FontSize="11.5"/>
+                </Border>
+            </Grid>
+        </TabItem>
+
+        <!-- ══════════════════ Monitoring & Analysis Tab ══════════════════ -->
+        <TabItem Header="📊  Monitoring &amp; Analysis"
+                 Visibility="{Binding SettingsVM.IsMonitoringVisible, Converter={StaticResource BoolToVis}}">
+            <TabControl Style="{StaticResource InnerTabControl}">
+
+                <!-- ─── Continuous Ping ─── -->
+                <TabItem Header="📡  Continuous Ping" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsContinuousPingVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding MonitoringVM.ContinuousPingVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>  <!-- Add Host bar -->
+                            <RowDefinition Height="*"/>     <!-- Scrollable host panels -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Add Host toolbar -->
+                        <Border Grid.Row="0" Background="#263238" Padding="8,5">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="➕  Add Host" Command="{Binding AddHostCommand}"
+                                        Style="{StaticResource ActionButton}" Background="#1565C0"
+                                        ToolTip="Add another host to ping in parallel"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Host panels (one per PingHostViewModel) -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Hosts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:PingHostViewModel}">
+                                        <Border BorderBrush="#2E3D45" BorderThickness="0,0,0,1">
+                                            <Grid Margin="0,4,0,6">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>  <!-- toolbar -->
+                                                    <RowDefinition Height="Auto"/>  <!-- stats -->
+                                                    <RowDefinition Height="150"/>   <!-- graph -->
+                                                    <RowDefinition Height="Auto"/>  <!-- status line -->
+                                                </Grid.RowDefinitions>
+
+                                                <!-- Toolbar -->
+                                                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4">
+                                                    <TextBlock Text="Host" VerticalAlignment="Center"
+                                                               Foreground="#546E7A" FontWeight="SemiBold" Margin="0,0,6,0"/>
+                                                    <ComboBox IsEditable="True"
+                                                              Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
+                                                              ItemsSource="{Binding AllHosts}"
+                                                              Width="210" Style="{StaticResource DarkComboBox}"
+                                                              ToolTip="Host or IP to ping — choose from the list or type a new one"/>
+                                                    <local:NumericUpDown Value="{Binding IntervalMs, Mode=TwoWay}"
+                                                                         Minimum="100" Maximum="60000" Step="100"
+                                                                         Width="80" Margin="8,0,0,0"
+                                                                         ToolTip="Ping interval (ms)"/>
+                                                    <TextBlock Text="ms" VerticalAlignment="Center" Margin="4,0,8,0"
+                                                               Foreground="#546E7A" FontWeight="SemiBold"/>
+                                                    <Button Content="▶ Start"  Command="{Binding StartCommand}"  Style="{StaticResource StartButton}"  Margin="0,0,4,0"/>
+                                                    <Button Content="■ Stop"   Command="{Binding StopCommand}"   Style="{StaticResource StopButton}"   Margin="0,0,4,0"/>
+                                                    <Button Content="🗑 Clear"  Command="{Binding ClearCommand}"  Style="{StaticResource ClearButton}"  Margin="0,0,4,0"/>
+                                                    <Button Content="✕ Remove" Command="{Binding RemoveCommand}" Style="{StaticResource ActionButton}" Background="#546E7A"
+                                                            ToolTip="Remove this host panel"/>
+                                                </StackPanel>
+
+                                                <!-- Stats — two rows: labels on top, values below -->
+                                                <Border Grid.Row="1" Background="#1A2330" CornerRadius="4" Margin="8,2" Padding="10,6">
+                                                    <UniformGrid Rows="2" Columns="6">
+                                                        <!-- Row 0 — labels -->
+                                                        <TextBlock Text="Min"       FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Avg"       FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Max"       FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Jitter"    FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Loss"      FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="Sent/Recv" FontSize="12" Foreground="#78909C" HorizontalAlignment="Center"/>
+                                                        <!-- Row 1 — values -->
+                                                        <TextBlock Text="{Binding MinMsDisplay}"
+                                                                   FontSize="14" FontWeight="SemiBold" Foreground="#80CBC4" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding AvgMs, StringFormat='{}{0:F1}'}"
+                                                                   FontSize="14" FontWeight="SemiBold" Foreground="#80CBC4" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding MaxMsDisplay}"
+                                                                   FontSize="14" FontWeight="SemiBold" Foreground="#80CBC4" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding JitterMs, StringFormat='{}{0:F1}'}"
+                                                                   FontSize="14" FontWeight="SemiBold" Foreground="#FFF176" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding LossPercent, StringFormat='{}{0:F1}%'}"
+                                                                   FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center">
+                                                            <TextBlock.Style>
+                                                                <Style TargetType="TextBlock">
+                                                                    <Setter Property="Foreground" Value="#A5D6A7"/>
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding HasPacketLoss}" Value="True">
+                                                                            <Setter Property="Foreground" Value="#EF9A9A"/>
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </TextBlock.Style>
+                                                        </TextBlock>
+                                                        <TextBlock Text="{Binding SentRecvDisplay}"
+                                                                   FontSize="14" FontWeight="SemiBold" Foreground="#80CBC4" HorizontalAlignment="Center"/>
+                                                    </UniformGrid>
+                                                </Border>
+
+                                                <!-- Ping graph (self-drawing UserControl) -->
+                                                <local:PingGraphControl Grid.Row="2" Margin="8,4"
+                                                                        SamplesSource="{Binding LatencySamples}"/>
+
+                                                <!-- Status line -->
+                                                <TextBlock Grid.Row="3" Text="{Binding StatusLine}"
+                                                           Foreground="#546E7A" FontSize="11" Margin="10,2,10,4"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── Network Interface Monitor ─── -->
+                <TabItem Header="🖧  Interface Monitor" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsInterfaceMonitorVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding MonitoringVM.InterfaceMonitorVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="▶ Start" Command="{Binding StartCommand}" Style="{StaticResource StartButton}"   Margin="0,0,4,0"/>
+                            <Button Content="■ Stop"  Command="{Binding StopCommand}"  Style="{StaticResource StopButton}"    Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#90A4AE" Margin="8,0,0,0"/>
+                        </StackPanel>
+
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding Interfaces}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Interface"  Binding="{Binding Name}"           Width="220"/>
+                                <DataGridTextColumn Header="↓ Rx/s"    Binding="{Binding RxPerSecDisplay}" Width="90"/>
+                                <DataGridTextColumn Header="↑ Tx/s"    Binding="{Binding TxPerSecDisplay}" Width="90"/>
+                                <DataGridTextColumn Header="Total Rx"  Binding="{Binding TotalRxDisplay}"  Width="110"/>
+                                <DataGridTextColumn Header="Total Tx"  Binding="{Binding TotalTxDisplay}"  Width="110"/>
+                                <DataGridTextColumn Header="Status"    Binding="{Binding Status}"          Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── ARP Table ─── -->
+                <TabItem Header="📋  ARP Table" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsArpTableVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding MonitoringVM.ArpTableVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource RefreshButton}"/>
+                            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#546E7A" Margin="8,0,0,0"/>
+                        </StackPanel>
+
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding Entries}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="IP Address"  Binding="{Binding IPAddress}" Width="160"/>
+                                <DataGridTextColumn Header="MAC Address" Binding="{Binding PhysicalAddress}" Width="160"/>
+                                <DataGridTextColumn Header="Name"        Binding="{Binding Name}" Width="200"/>
+                                <DataGridTextColumn Header="Type"        Binding="{Binding Type}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── Route Table ─── -->
+                <TabItem Header="🗺  Route Table" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsRouteTableVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding MonitoringVM.RouteTableVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource RefreshButton}"/>
+                            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#546E7A" Margin="8,0,0,0"/>
+                        </StackPanel>
+
+                        <TextBlock Grid.Row="1" Text="IPv4 Routes" Foreground="#546E7A" FontWeight="SemiBold"
+                                   Margin="10,4,10,2"/>
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding IPv4Routes}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Gateway to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Network"   Binding="{Binding Network}"     Width="160"/>
+                                <DataGridTextColumn Header="Netmask"   Binding="{Binding Netmask}"     Width="140"/>
+                                <DataGridTextColumn Header="Gateway"   Binding="{Binding Gateway}"     Width="140"/>
+                                <DataGridTextColumn Header="Interface" Binding="{Binding Interface}"   Width="140"/>
+                                <DataGridTextColumn Header="Metric"    Binding="{Binding Metric}"      Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="3" Text="IPv6 Routes" Foreground="#546E7A" FontWeight="SemiBold"
+                                   Margin="10,8,10,2"/>
+                        <DataGrid Grid.Row="4" ItemsSource="{Binding IPv6Routes}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add Gateway to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Network"   Binding="{Binding Network}"     Width="200"/>
+                                <DataGridTextColumn Header="Gateway"   Binding="{Binding Gateway}"     Width="200"/>
+                                <DataGridTextColumn Header="Interface" Binding="{Binding Interface}"   Width="160"/>
+                                <DataGridTextColumn Header="Metric"    Binding="{Binding Metric}"      Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="5" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
+        </TabItem>
+
+        <!-- ══════════════════ Wi-Fi & Local Network Tab ══════════════════ -->
+        <TabItem Header="📶  Wi-Fi &amp; Local"
+                 Visibility="{Binding SettingsVM.IsWifiVisible, Converter={StaticResource BoolToVis}}">
+            <TabControl Style="{StaticResource InnerTabControl}">
+
+                <!-- ─── Wi-Fi Signal Monitor ─── -->
+                <TabItem Header="📡  Wi-Fi Signal" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsWifiSignalVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding WifiNetworkVM.WifiMonitorVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="▶ Start"   Command="{Binding StartCommand}"   Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <Button Content="■ Stop"    Command="{Binding StopCommand}"    Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <Button Content="🗑 Clear"   Command="{Binding ClearCommand}"   Style="{StaticResource ActionButton}" Margin="0,0,10,0"/>
+                            <TextBlock Text="Poll Interval (seconds)" VerticalAlignment="Center" Foreground="#546E7A" Margin="0,0,6,0" FontWeight="SemiBold"/>
+                            <local:NumericUpDown Value="{Binding IntervalSec, Mode=TwoWay}"
+                                                 Minimum="1" Maximum="3600" Step="1" Width="70"
+                                                 ToolTip="Poll interval (seconds)"/>
+                        </StackPanel>
+
+                        <!-- Info cards -->
+                        <WrapPanel Grid.Row="1" Margin="8,0,8,4">
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="SSID  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding Ssid}" Foreground="#80CBC4" FontWeight="SemiBold"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="BSSID  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding Bssid}" Foreground="#B0BEC5"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Ch  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding Channel}" Foreground="#B0BEC5"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Radio  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding RadioType}" Foreground="#B0BEC5"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Auth  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding Auth}" Foreground="#B0BEC5"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#1E2A32" CornerRadius="4" Padding="8,4" Margin="0,2,6,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="↓  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding RxMbps}" Foreground="#A5D6A7"/>
+                                    <TextBlock Text=" Mbps  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="↑  " Foreground="#546E7A" FontSize="11"/>
+                                    <TextBlock Text="{Binding TxMbps}" Foreground="#A5D6A7"/>
+                                    <TextBlock Text=" Mbps" Foreground="#546E7A" FontSize="11"/>
+                                </StackPanel>
+                            </Border>
+                        </WrapPanel>
+
+                        <!-- Signal bar + pct -->
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="10,0,10,4">
+                            <TextBlock Text="{Binding SignalBar}" Foreground="#4DD0E1" FontFamily="Consolas"
+                                       FontSize="13" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SignalPct, StringFormat='  {0}%'}" Foreground="#4DD0E1"
+                                       FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Graph Canvas -->
+                        <Border Grid.Row="3" Background="#111A20" BorderBrush="#37474F" BorderThickness="1"
+                                Margin="8,2,8,4" CornerRadius="4">
+                            <Canvas x:Name="WifiGraphCanvas">
+                                <Polyline x:Name="WifiGraphLine"
+                                          Stroke="#4DD0E1" StrokeThickness="1.5"
+                                          StrokeLineJoin="Round" Points=""/>
+                            </Canvas>
+                        </Border>
+
+                        <TextBlock Grid.Row="4" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── LAN Device Scanner ─── -->
+                <TabItem Header="🔍  LAN Scanner" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsLanScannerVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding WifiNetworkVM.LanScannerVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <TextBlock Text="Subnet" VerticalAlignment="Center" Foreground="#546E7A"
+                                       FontSize="12" Margin="0,0,8,0"/>
+                            <TextBox Text="{Binding SubnetHint, UpdateSourceTrigger=PropertyChanged}" Width="130"
+                                     Padding="6,4" Background="#2D2D2D" Foreground="#ECEFF1" BorderBrush="#546E7A"
+                                     ToolTip="First 3 octets, e.g. 192.168.1"/>
+                            <TextBlock Text=".0 /" VerticalAlignment="Center"
+                                       Foreground="#546E7A" FontSize="12" Margin="4,0,4,0"/>
+                            <local:NumericUpDown Value="{Binding MaskBits, Mode=TwoWay}"
+                                                 Minimum="16" Maximum="30" Step="1"
+                                                 Width="64" Margin="0,0,14,0"
+                                                 ToolTip="Subnet mask bits (16–30). /24 = 254 hosts, /16 = up to 4096 scanned"/>
+                            <CheckBox Content="Resolve hostnames" IsChecked="{Binding ResolveNames}"
+                                      Foreground="#546E7A" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <Button Content="🔍  Scan"   Command="{Binding ScanCommand}"   Style="{StaticResource ScanButton}"   Margin="0,0,4,0"/>
+                            <Button Content="✖  Cancel" Command="{Binding CancelCommand}" Style="{StaticResource CancelButton}"/>
+                        </StackPanel>
+
+                        <!-- Progress bar -->
+                        <ProgressBar Grid.Row="1" Value="{Binding ProgressPercent}" Maximum="100"
+                                     Height="4" Margin="8,0,8,6"
+                                     Background="#1E2A32" Foreground="#80CBC4"/>
+
+                        <!-- Search bar -->
+                        <Border Grid.Row="2" Background="#1A2330" BorderBrush="#37474F" BorderThickness="1"
+                                CornerRadius="4" Margin="8,0,8,6" Padding="8,5">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="🔎" FontSize="13"
+                                           VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#546E7A"/>
+                                <TextBox Grid.Column="1"
+                                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         Background="Transparent" Foreground="#ECEFF1"
+                                         BorderThickness="0" VerticalAlignment="Center"
+                                         CaretBrush="#ECEFF1"
+                                         ToolTip="Filter by IP address, MAC address, or hostname">
+                                    <TextBox.Style>
+                                        <Style TargetType="TextBox">
+                                            <Style.Triggers>
+                                                <Trigger Property="Text" Value="">
+                                                    <Setter Property="Background">
+                                                        <Setter.Value>
+                                                            <VisualBrush Stretch="None" AlignmentX="Left">
+                                                                <VisualBrush.Visual>
+                                                                    <TextBlock Text="Search by IP, MAC, or hostname…"
+                                                                               Foreground="#546E7A" FontStyle="Italic"/>
+                                                                </VisualBrush.Visual>
+                                                            </VisualBrush>
+                                                        </Setter.Value>
+                                                    </Setter>
+                                                </Trigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                                <Border Grid.Column="2" Background="#1E2A32" CornerRadius="3"
+                                        Padding="6,2" Margin="8,0,6,0">
+                                    <TextBlock Foreground="#546E7A" FontSize="11"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding FilteredCount, StringFormat='{}{0} device(s)'}"/>
+                                </Border>
+                                <Button Grid.Column="3" Content="✕"
+                                        Command="{Binding ClearSearchCommand}"
+                                        Foreground="#546E7A" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" FontSize="12" Padding="4,2"
+                                        ToolTip="Clear search"/>
+                            </Grid>
+                        </Border>
+
+                        <DataGrid Grid.Row="3" ItemsSource="{Binding FilteredDevices}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="IP Address"  Binding="{Binding IP}"         Width="140"/>
+                                <DataGridTextColumn Header="MAC"         Binding="{Binding MAC}"        Width="150"/>
+                                <DataGridTextColumn Header="Hostname"    Binding="{Binding Hostname}"   Width="200"/>
+                                <DataGridTextColumn Header="Response"    Binding="{Binding ResponseMs}" Width="90"/>
+                                <DataGridTextColumn Header="Status"      Binding="{Binding Status}"     Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="4" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── DHCP Leases ─── -->
+                <TabItem Header="🏠  DHCP Leases" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsDhcpLeasesVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding WifiNetworkVM.DhcpVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#90A4AE" Margin="8,0,0,0"/>
+                        </StackPanel>
+
+                        <DataGrid Grid.Row="1" ItemsSource="{Binding Leases}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Adapter"       Binding="{Binding AdapterName}"     Width="180"/>
+                                <DataGridTextColumn Header="IP Address"    Binding="{Binding IPAddress}"       Width="130"/>
+                                <DataGridTextColumn Header="Subnet"        Binding="{Binding SubnetMask}"      Width="120"/>
+                                <DataGridTextColumn Header="Gateway"       Binding="{Binding DefaultGateway}"  Width="120"/>
+                                <DataGridTextColumn Header="DHCP Server"   Binding="{Binding DhcpServer}"      Width="120"/>
+                                <DataGridTextColumn Header="Lease Obtained" Binding="{Binding LeaseObtained}"  Width="180"/>
+                                <DataGridTextColumn Header="Lease Expires" Binding="{Binding LeaseExpires}"    Width="180"/>
+                                <DataGridTextColumn Header="Days Left"     Binding="{Binding DaysLeft}"        Width="70">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DhcpEnabled}" Value="False">
+                                                    <Setter Property="Foreground" Value="#78909C"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="DNS Servers"   Binding="{Binding DnsServers}"      Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="2" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
+        </TabItem>
+
+        <!-- ══════════════════ Core Network Diagnostics Tab ══════════════════ -->
+        <TabItem Header="🔧  Core Network Diagnostics"
+                 Visibility="{Binding SettingsVM.IsCoreNetworkVisible, Converter={StaticResource BoolToVis}}">
+            <TabControl Style="{StaticResource InnerTabControl}">
+
+                <!-- ─────────────────── Traceroute ─────────────────── -->
+                <TabItem Header="🔍  Traceroute" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsTracerouteVisible, Converter={StaticResource BoolToVis}}">
+            <Grid Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Address input row -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0"
+                               Text="Target:"
+                               VerticalAlignment="Center"
+                               FontSize="13"
+                               Foreground="#546E7A"
+                               Margin="0,0,8,0"/>
+
+                    <ComboBox Grid.Column="1"
+                              IsEditable="True"
+                              Text="{Binding TracerouteVM.SelectedAddress, UpdateSourceTrigger=PropertyChanged}"
+                              ItemsSource="{Binding TracerouteVM.AllAddresses}"
+                              Height="32"
+                              FontSize="13"
+                              Width="170"
+                              Margin="0,0,8,0"
+                              Style="{StaticResource DarkComboBox}"
+                              VerticalContentAlignment="Center"/>
+
+                    <Button Grid.Column="2"
+                            Content="▶  Trace"
+                            Command="{Binding TracerouteVM.RunCommand}"
+                            Background="#43A047"
+                            Padding="14,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+
+                    <Button Grid.Column="3"
+                            Content="⏹  Cancel"
+                            Command="{Binding TracerouteVM.CancelCommand}"
+                            Background="#FB8C00"
+                            Padding="14,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+
+                    <Button Grid.Column="4"
+                            Content="🗑  Clear"
+                            Command="{Binding TracerouteVM.ClearOutputCommand}"
+                            Background="#546E7A"
+                            Padding="14,5"
+                            Style="{StaticResource ActionButton}"/>
+                </Grid>
+
+                <!-- Output area -->
+                <Border Grid.Row="1"
+                        Background="White"
+                        BorderBrush="#CFD8DC"
+                        BorderThickness="1"
+                        CornerRadius="4">
+                    <ScrollViewer x:Name="TracerouteScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="TracerouteOutput"
+                                   Text="{Binding TracerouteVM.Output}"
+                                   FontFamily="Consolas"
+                                   FontSize="13"
+                                   Foreground="#263238"
+                                   Padding="12"
+                                   TextWrapping="NoWrap"/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── Network Info ─────────────────── -->
+                <TabItem Header="🌐  Network Info" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsNetworkInfoVisible, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- toolbar -->
+                    <RowDefinition Height="*"/>      <!-- grid -->
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0" Background="#455A64" Padding="8,6">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="🔄  Refresh"
+                                Command="{Binding IPConfigVM.RefreshCommand}"
+                                Background="#1E88E5"
+                                Padding="12,5"
+                                Style="{StaticResource ActionButton}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Interfaces DataGrid -->
+                <DataGrid Grid.Row="1"
+                          ItemsSource="{Binding IPConfigVM.Interfaces}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E0E0E0"
+                          RowBackground="White"
+                          AlternatingRowBackground="#FAFAFA"
+                          CanUserResizeRows="False"
+                          CanUserReorderColumns="False"
+                          BorderThickness="0"
+                          HeadersVisibility="Column"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Auto">
+
+                    <DataGrid.Columns>
+
+                        <!-- Status indicator dot -->
+                        <DataGridTemplateColumn Width="40" CanUserSort="False" CanUserResize="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Ellipse Width="12" Height="12" HorizontalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="#F44336"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Up">
+                                                        <Setter Property="Fill" Value="#4CAF50"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+
+                        <DataGridTextColumn Header="Name"         Binding="{Binding Name}"        Width="120" MinWidth="80"/>
+                        <DataGridTextColumn Header="Status"       Binding="{Binding Status}"      Width="80"/>
+                        <DataGridTextColumn Header="Type"         Binding="{Binding Type}"        Width="120"/>
+                        <DataGridTextColumn Header="IPv4 Address" Binding="{Binding IPv4Address}" Width="120"/>
+                        <DataGridTextColumn Header="Subnet Mask"  Binding="{Binding SubnetMask}"  Width="120"/>
+                        <DataGridTextColumn Header="Gateway"      Binding="{Binding Gateway}"     Width="120"/>
+                        <DataGridTextColumn Header="DNS Servers"  Binding="{Binding DnsServers}"  Width="160"/>
+                        <DataGridTextColumn Header="IPv6 Address" Binding="{Binding IPv6Address}" Width="200"/>
+                        <DataGridTextColumn Header="MAC"          Binding="{Binding MacAddress}"  Width="150"/>
+                        <DataGridTextColumn Header="Speed"        Binding="{Binding Speed}"       Width="90"/>
+                        <DataGridTextColumn Header="Description"  Binding="{Binding Description}" Width="*" MinWidth="100"/>
+
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── DNS Lookup ─────────────────── -->
+                <TabItem Header="🔎  DNS Lookup" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsDnsLookupVisible, Converter={StaticResource BoolToVis}}">
+            <Grid Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Input row -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Host:" VerticalAlignment="Center"
+                               FontSize="13" Foreground="#546E7A" Margin="0,0,6,0"/>
+
+                    <ComboBox Grid.Column="1" IsEditable="True"
+                              Text="{Binding DnsLookupVM.Host, UpdateSourceTrigger=PropertyChanged}"
+                              ItemsSource="{Binding DnsLookupVM.AllHosts}"
+                              Height="32" FontSize="13" Width="170" Margin="0,0,8,0"
+                              Style="{StaticResource DarkComboBox}"
+                              VerticalContentAlignment="Center"/>
+
+                    <TextBlock Grid.Column="2" Text="Type:" VerticalAlignment="Center"
+                               FontSize="13" Foreground="#546E7A" Margin="0,0,6,0"/>
+
+                    <ComboBox Grid.Column="3"
+                              SelectedItem="{Binding DnsLookupVM.RecordType}"
+                              ItemsSource="{Binding Source={x:Static vm:DnsLookupViewModel.RecordTypes}}"
+                              Height="32" FontSize="13" Margin="0,0,8,0" Width="90"
+                              Style="{StaticResource DarkComboBox}"/>
+
+                    <TextBlock Grid.Column="4" Text="Server:" VerticalAlignment="Center"
+                               FontSize="13" Foreground="#546E7A" Margin="0,0,6,0"/>
+
+                    <TextBox Grid.Column="5"
+                             Text="{Binding DnsLookupVM.DnsServer, UpdateSourceTrigger=PropertyChanged}"
+                             Height="32" FontSize="13" Width="120" Padding="6,0"
+                             VerticalContentAlignment="Center"
+                             Margin="0,0,8,0" ToolTip="Optional: override DNS server (leave blank for system default)"/>
+
+                    <Button Grid.Column="6" Content="🔎  Lookup"
+                            Command="{Binding DnsLookupVM.LookupCommand}"
+                            Background="#1E88E5" Padding="12,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+
+                    <Button Grid.Column="7" Content="⏹  Cancel"
+                            Command="{Binding DnsLookupVM.CancelCommand}"
+                            Background="#FB8C00" Padding="12,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+                </Grid>
+
+                <!-- Output pane -->
+                <Border Grid.Row="1" Background="White" BorderBrush="#CFD8DC"
+                        BorderThickness="1" CornerRadius="4">
+                    <ScrollViewer x:Name="DnsScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="DnsOutput"
+                                   Text="{Binding DnsLookupVM.Output}"
+                                   FontFamily="Consolas" FontSize="13"
+                                   Foreground="#263238" Padding="12"
+                                   TextWrapping="NoWrap"/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── Port Scanner ─────────────────── -->
+                <TabItem Header="🔌  Port Scanner" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsPortScannerVisible, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- toolbar -->
+                    <RowDefinition Height="Auto"/>   <!-- progress -->
+                    <RowDefinition Height="*"/>      <!-- results grid -->
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar / input -->
+                <Border Grid.Row="0" Background="#455A64" Padding="8,6">
+                    <WrapPanel Orientation="Horizontal">
+
+                        <TextBlock Text="Host:" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="White" Margin="0,0,6,0"/>
+                        <ComboBox IsEditable="True"
+                                  Text="{Binding PortScannerVM.Host, UpdateSourceTrigger=PropertyChanged}"
+                                  ItemsSource="{Binding PortScannerVM.AllHosts}"
+                                  Height="28" FontSize="12" Width="170" Margin="0,0,10,0"
+                                  Style="{StaticResource DarkComboBox}"
+                                  VerticalContentAlignment="Center"/>
+
+                        <TextBlock Text="Ports:" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="White" Margin="0,0,6,0"/>
+                        <!-- Port picker: ToggleButton opens a Popup with a checked TreeView + CRUD -->
+                        <Grid Margin="0,0,10,0" VerticalAlignment="Center">
+                            <ToggleButton x:Name="PortPickerToggle"
+                                          Content="{Binding PortScannerVM.SelectedPortsSummary}"
+                                          Height="28" Width="200"
+                                          Style="{StaticResource DropdownToggleButton}"
+                                          ToolTip="Click to select ports to scan"/>
+                            <Popup IsOpen="{Binding IsChecked, ElementName=PortPickerToggle, Mode=TwoWay}"
+                                   StaysOpen="False"
+                                   PlacementTarget="{Binding ElementName=PortPickerToggle}"
+                                   Placement="Bottom"
+                                   AllowsTransparency="True"
+                                   PopupAnimation="Fade">
+                                <Border Background="#263238" BorderBrush="#546E7A" BorderThickness="1"
+                                        CornerRadius="0,0,4,4" Width="340">
+                                    <Border.Resources>
+                                        <!-- Small icon button used throughout this popup -->
+                                        <Style x:Key="SmallBtn" TargetType="Button">
+                                            <Setter Property="Width"           Value="20"/>
+                                            <Setter Property="Height"          Value="20"/>
+                                            <Setter Property="Padding"         Value="0"/>
+                                            <Setter Property="Margin"          Value="2,0,0,0"/>
+                                            <Setter Property="FontSize"        Value="11"/>
+                                            <Setter Property="BorderThickness" Value="0"/>
+                                            <Setter Property="Foreground"      Value="#90A4AE"/>
+                                            <Setter Property="Background"      Value="Transparent"/>
+                                            <Setter Property="Cursor"          Value="Hand"/>
+                                            <Setter Property="Template"        Value="{StaticResource RoundButtonTemplate}"/>
+                                        </Style>
+                                        <!-- Compact text box for inline editing -->
+                                        <Style x:Key="InlineBox" TargetType="TextBox">
+                                            <Setter Property="Background"   Value="#37474F"/>
+                                            <Setter Property="Foreground"   Value="#ECEFF1"/>
+                                            <Setter Property="BorderBrush"  Value="#546E7A"/>
+                                            <Setter Property="BorderThickness" Value="1"/>
+                                            <Setter Property="Padding"      Value="3,1"/>
+                                            <Setter Property="FontSize"     Value="12"/>
+                                            <Setter Property="Height"       Value="22"/>
+                                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                                        </Style>
+                                    </Border.Resources>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>  <!-- header bar -->
+                                            <RowDefinition Height="*"/>     <!-- tree -->
+                                        </Grid.RowDefinitions>
+
+                                        <!-- ── Header: Select All / None + Add Category ── -->
+                                        <Border Grid.Row="0" Background="#1E2D35" Padding="6,5">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                </Grid.ColumnDefinitions>
+                                                <Button Grid.Column="0" Content="☑ All"  FontSize="12" Foreground="White"
+                                                        Background="#2E7D32" Padding="6,3" Margin="0,0,4,0"
+                                                        Command="{Binding PortScannerVM.SelectAllCommand}"
+                                                        Style="{StaticResource ActionButton}"/>
+                                                <Button Grid.Column="1" Content="☐ None" FontSize="12" Foreground="White"
+                                                        Background="#546E7A" Padding="6,3"
+                                                        Command="{Binding PortScannerVM.DeselectAllCommand}"
+                                                        Style="{StaticResource ActionButton}"/>
+                                                <!-- Add Category – button OR inline form -->
+                                                <Button Grid.Column="3" Content="＋ Category" FontSize="11"
+                                                        Background="#1565C0" Padding="6,3"
+                                                        Command="{Binding PortScannerVM.ShowAddCategoryCommand}">
+                                                    <Button.Style>
+                                                        <Style TargetType="Button" BasedOn="{StaticResource ActionButton}">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding PortScannerVM.IsAddingCategory}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Button.Style>
+                                                </Button>
+                                                <StackPanel Grid.Column="3" Orientation="Horizontal">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding PortScannerVM.IsAddingCategory}" Value="True">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+                                                    <TextBox Text="{Binding PortScannerVM.NewCategoryName, UpdateSourceTrigger=PropertyChanged}"
+                                                             Width="100" Background="#37474F" Foreground="#ECEFF1"
+                                                             BorderBrush="#546E7A" BorderThickness="1"
+                                                             Padding="4,1" FontSize="12" Height="24"
+                                                             VerticalContentAlignment="Center"
+                                                             ToolTip="New category name"/>
+                                                    <Button Content="✓" FontSize="12" Width="24" Height="24" Margin="2,0,0,0"
+                                                            Foreground="#A5D6A7" Background="Transparent" BorderThickness="0"
+                                                            Cursor="Hand" Template="{StaticResource RoundButtonTemplate}"
+                                                            Command="{Binding PortScannerVM.CommitAddCategoryCommand}"/>
+                                                    <Button Content="✕" FontSize="12" Width="24" Height="24" Margin="2,0,0,0"
+                                                            Foreground="#EF9A9A" Background="Transparent" BorderThickness="0"
+                                                            Cursor="Hand" Template="{StaticResource RoundButtonTemplate}"
+                                                            Command="{Binding PortScannerVM.CancelAddCategoryCommand}"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+
+                                        <!-- ── Tree ── -->
+                                        <ScrollViewer Grid.Row="1" MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                            <TreeView ItemsSource="{Binding PortScannerVM.PortCategories}"
+                                                      Background="Transparent" BorderThickness="0">
+                                                <TreeView.ItemContainerStyle>
+                                                    <Style TargetType="TreeViewItem">
+                                                        <Setter Property="IsExpanded" Value="True"/>
+                                                        <Setter Property="Background" Value="Transparent"/>
+                                                        <Setter Property="Foreground" Value="#ECEFF1"/>
+                                                        <Setter Property="Padding"    Value="2,1"/>
+                                                    </Style>
+                                                </TreeView.ItemContainerStyle>
+                                                <TreeView.ItemTemplate>
+                                                    <HierarchicalDataTemplate ItemsSource="{Binding Ports}">
+                                                        <!-- Category header + inline add-port form -->
+                                                        <StackPanel>
+                                                            <!-- Category row: checkbox + name + add/delete buttons -->
+                                                            <Grid>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="20"/>
+                                                                    <ColumnDefinition Width="20"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <CheckBox Grid.Column="0"
+                                                                          IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                                          IsThreeState="True"
+                                                                          Content="{Binding Name}"
+                                                                          Foreground="#ECEFF1"
+                                                                          FontWeight="SemiBold"
+                                                                          FontSize="12"
+                                                                          Margin="2,2"/>
+                                                                <Button Grid.Column="1" Content="+"
+                                                                        Command="{Binding ShowAddPortCommand}"
+                                                                        Style="{StaticResource SmallBtn}"
+                                                                        ToolTip="Add port to this category"/>
+                                                                <Button Grid.Column="2" Content="×"
+                                                                        Command="{Binding DeleteCommand}"
+                                                                        Style="{StaticResource SmallBtn}"
+                                                                        ToolTip="Delete this category"/>
+                                                            </Grid>
+                                                            <!-- Inline add-port form (visible when IsAddingPort=true) -->
+                                                            <Grid Margin="20,2,0,2">
+                                                                <Grid.Style>
+                                                                    <Style TargetType="Grid">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsAddingPort}" Value="True">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </Grid.Style>
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="55"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="22"/>
+                                                                    <ColumnDefinition Width="22"/>
+                                                                </Grid.ColumnDefinitions>
+                                                                <TextBox Grid.Column="0"
+                                                                         Text="{Binding NewPortNumber, UpdateSourceTrigger=PropertyChanged}"
+                                                                         Style="{StaticResource InlineBox}"
+                                                                         ToolTip="Port number (1–65535)"/>
+                                                                <TextBox Grid.Column="1"
+                                                                         Text="{Binding NewPortService, UpdateSourceTrigger=PropertyChanged}"
+                                                                         Style="{StaticResource InlineBox}"
+                                                                         Margin="3,0,0,0"
+                                                                         ToolTip="Service name (optional)"/>
+                                                                <Button Grid.Column="2" Content="✓"
+                                                                        Command="{Binding CommitAddPortCommand}"
+                                                                        Style="{StaticResource SmallBtn}"
+                                                                        Foreground="#A5D6A7"/>
+                                                                <Button Grid.Column="3" Content="✕"
+                                                                        Command="{Binding CancelAddPortCommand}"
+                                                                        Style="{StaticResource SmallBtn}"
+                                                                        Foreground="#EF9A9A"/>
+                                                            </Grid>
+                                                        </StackPanel>
+
+                                                        <!-- Port item template -->
+                                                        <HierarchicalDataTemplate.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid>
+                                                                    <!-- Normal view (hidden while editing) -->
+                                                                    <Grid>
+                                                                        <Grid.Style>
+                                                                            <Style TargetType="Grid">
+                                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Grid.Style>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="20"/>
+                                                                            <ColumnDefinition Width="20"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <CheckBox Grid.Column="0"
+                                                                                  IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                                                                  Content="{Binding DisplayText}"
+                                                                                  Foreground="#B0BEC5"
+                                                                                  FontSize="12"
+                                                                                  FontFamily="Consolas"
+                                                                                  Margin="2,1"/>
+                                                                        <Button Grid.Column="1" Content="✎"
+                                                                                Command="{Binding BeginEditCommand}"
+                                                                                Style="{StaticResource SmallBtn}"
+                                                                                ToolTip="Edit port"/>
+                                                                        <Button Grid.Column="2" Content="×"
+                                                                                Command="{Binding DeleteCommand}"
+                                                                                Style="{StaticResource SmallBtn}"
+                                                                                ToolTip="Delete port"/>
+                                                                    </Grid>
+                                                                    <!-- Edit view (visible while editing) -->
+                                                                    <Grid>
+                                                                        <Grid.Style>
+                                                                            <Style TargetType="Grid">
+                                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                                <Style.Triggers>
+                                                                                    <DataTrigger Binding="{Binding IsEditing}" Value="True">
+                                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                                    </DataTrigger>
+                                                                                </Style.Triggers>
+                                                                            </Style>
+                                                                        </Grid.Style>
+                                                                        <Grid.ColumnDefinitions>
+                                                                            <ColumnDefinition Width="55"/>
+                                                                            <ColumnDefinition Width="*"/>
+                                                                            <ColumnDefinition Width="22"/>
+                                                                            <ColumnDefinition Width="22"/>
+                                                                        </Grid.ColumnDefinitions>
+                                                                        <TextBox Grid.Column="0"
+                                                                                 Text="{Binding EditPort, UpdateSourceTrigger=PropertyChanged}"
+                                                                                 Style="{StaticResource InlineBox}"
+                                                                                 ToolTip="Port number (1–65535)"/>
+                                                                        <TextBox Grid.Column="1"
+                                                                                 Text="{Binding EditService, UpdateSourceTrigger=PropertyChanged}"
+                                                                                 Style="{StaticResource InlineBox}"
+                                                                                 Margin="3,0,0,0"
+                                                                                 ToolTip="Service name"/>
+                                                                        <Button Grid.Column="2" Content="✓"
+                                                                                Command="{Binding CommitEditCommand}"
+                                                                                Style="{StaticResource SmallBtn}"
+                                                                                Foreground="#A5D6A7"/>
+                                                                        <Button Grid.Column="3" Content="✕"
+                                                                                Command="{Binding CancelEditCommand}"
+                                                                                Style="{StaticResource SmallBtn}"
+                                                                                Foreground="#EF9A9A"/>
+                                                                    </Grid>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </HierarchicalDataTemplate.ItemTemplate>
+                                                    </HierarchicalDataTemplate>
+                                                </TreeView.ItemTemplate>
+                                            </TreeView>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Popup>
+                        </Grid>
+
+                        <TextBlock Text="Timeout (ms):" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="White" Margin="0,0,6,0"/>
+                        <local:NumericUpDown Value="{Binding PortScannerVM.TimeoutMs, Mode=TwoWay}"
+                                             Minimum="100" Maximum="30000" Step="100"
+                                             Width="72" Margin="0,0,10,0"/>
+
+                        <TextBlock Text="Concurrent:" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="White" Margin="0,0,6,0"/>
+                        <local:NumericUpDown Value="{Binding PortScannerVM.MaxConcurrent, Mode=TwoWay}"
+                                             Minimum="1" Maximum="500" Step="1"
+                                             Width="64" Margin="0,0,12,0"/>
+
+                        <Button Content="▶  Scan"
+                                Command="{Binding PortScannerVM.ScanCommand}"
+                                Background="#43A047" Padding="12,4" Margin="0,0,4,0"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="⏹  Cancel"
+                                Command="{Binding PortScannerVM.CancelCommand}"
+                                Background="#FB8C00" Padding="12,4" Margin="0,0,4,0"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="🗑  Clear"
+                                Command="{Binding PortScannerVM.ClearCommand}"
+                                Background="#546E7A" Padding="12,4"
+                                Style="{StaticResource ActionButton}"/>
+                    </WrapPanel>
+                </Border>
+
+                <!-- Progress + status -->
+                <Grid Grid.Row="1" Margin="12,6,12,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ProgressBar Grid.Column="0" Height="10"
+                                 Value="{Binding PortScannerVM.ProgressPercent}" Maximum="100"
+                                 Background="#E0E0E0" Foreground="#1E88E5" Margin="0,0,10,0"/>
+                    <TextBlock Grid.Column="1" Text="{Binding PortScannerVM.StatusText}"
+                               FontSize="12" Foreground="#546E7A" VerticalAlignment="Center"/>
+                </Grid>
+
+                <!-- Results DataGrid (open ports only) -->
+                <DataGrid Grid.Row="2"
+                          ItemsSource="{Binding PortScannerVM.Results}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E0E0E0"
+                          RowBackground="White" AlternatingRowBackground="#FAFAFA"
+                          CanUserResizeRows="False" CanUserReorderColumns="False"
+                          BorderThickness="0" HeadersVisibility="Column"
+                          VerticalScrollBarVisibility="Auto">
+
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="40" CanUserSort="False" CanUserResize="False">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Ellipse Width="12" Height="12" Fill="#4CAF50" HorizontalAlignment="Center"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Port"    Binding="{Binding Port}"        Width="80"/>
+                        <DataGridTextColumn Header="Service" Binding="{Binding ServiceName}" Width="180"/>
+                        <DataGridTextColumn Header="Status"  Binding="{Binding Status}"      Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── Netstat ─────────────────── -->
+                <TabItem Header="🖧  Netstat" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsNetstatVisible, Converter={StaticResource BoolToVis}}">
+            <Grid DataContext="{Binding NetstatVM}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0" Background="#455A64" Padding="8,6">
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="🔄  Refresh"
+                                Command="{Binding RefreshCommand}"
+                                Background="#1E88E5" Padding="12,5" Margin="0,0,4,0"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="☠  Kill Process"
+                                Command="{Binding KillProcessCommand}"
+                                Background="#E53935" Padding="12,5"
+                                Style="{StaticResource ActionButton}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Filter bar -->
+                <Border Grid.Row="1" Background="#37474F" Padding="8,5"
+                        BorderThickness="0,1,0,0" BorderBrush="#546E7A">
+                    <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Protocol:" VerticalAlignment="Center"
+                                   Foreground="#B0BEC5" FontSize="12" Margin="0,0,5,0"/>
+                        <ComboBox ItemsSource="{Binding AvailableProtocols}"
+                                  SelectedItem="{Binding ProtocolFilter}"
+                                  Width="80" Height="26" FontSize="12" Margin="0,0,14,0"
+                                  Style="{StaticResource DarkComboBox}"
+                                  VerticalContentAlignment="Center"/>
+
+                        <TextBlock Text="State:" VerticalAlignment="Center"
+                                   Foreground="#B0BEC5" FontSize="12" Margin="0,0,5,0"/>
+                        <ComboBox ItemsSource="{Binding AvailableStates}"
+                                  SelectedItem="{Binding StateFilter}"
+                                  Width="140" Height="26" FontSize="12" Margin="0,0,14,0"
+                                  Style="{StaticResource DarkComboBox}"
+                                  VerticalContentAlignment="Center"/>
+
+                        <TextBlock Text="🔍  Search:" VerticalAlignment="Center"
+                                   Foreground="#B0BEC5" FontSize="12" Margin="0,0,5,0"/>
+                        <TextBox Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 Width="220" Height="26" FontSize="12" Margin="0,0,8,0"
+                                 Background="#2D2D2D" Foreground="#ECEFF1"
+                                 BorderBrush="#546E7A" BorderThickness="1"
+                                 Padding="6,3" VerticalContentAlignment="Center"
+                                 ToolTip="Search port, address, PID or executable"/>
+                        <Button Content="✕  Clear"
+                                Command="{Binding ClearFiltersCommand}"
+                                Background="#546E7A" Padding="10,3" Height="26"
+                                ToolTip="Clear all filters"
+                                Style="{StaticResource ActionButton}"/>
+                    </WrapPanel>
+                </Border>
+
+                <!-- Connections DataGrid -->
+                <DataGrid Grid.Row="2"
+                          ItemsSource="{Binding ConnectionsView}"
+                          SelectedItem="{Binding SelectedConnection}"
+                          AutoGenerateColumns="False"
+                          IsReadOnly="True"
+                          SelectionMode="Single"
+                          GridLinesVisibility="Horizontal"
+                          HorizontalGridLinesBrush="#E0E0E0"
+                          RowBackground="White"
+                          AlternatingRowBackground="#FAFAFA"
+                          CanUserResizeRows="False"
+                          CanUserReorderColumns="False"
+                          BorderThickness="0"
+                          HeadersVisibility="Column"
+                          VerticalScrollBarVisibility="Auto"
+                          Tag="{Binding DataContext, ElementName=RootWindow}">
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="☠  Kill Process"
+                                      Command="{Binding PlacementTarget.DataContext.KillProcessCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <Separator/>
+                            <MenuItem Header="Add Local IP to Ping List"
+                                      Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem.LocalPingTarget,
+                                                                  RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Header="Add Foreign IP to Ping List"
+                                      Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem.ForeignPingTarget,
+                                                                  RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
+
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Protocol"        Binding="{Binding Protocol}"       Width="75"/>
+                        <DataGridTextColumn Header="Local Address"   Binding="{Binding LocalAddress}"   Width="175"/>
+                        <DataGridTextColumn Header="Foreign Address" Binding="{Binding ForeignAddress}" Width="175"/>
+                        <DataGridTextColumn Header="State"           Binding="{Binding State}"          Width="120"/>
+                        <DataGridTextColumn Header="Process ID"      Binding="{Binding ProcessId}"      Width="85"/>
+                        <DataGridTextColumn Header="Executable"      Binding="{Binding Executable}"     Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+
+                <TextBlock Grid.Row="3" Text="{Binding StatusText}"
+                           Foreground="#546E7A" FontSize="11" Margin="10,4,10,4"/>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── Speed Test ─────────────────── -->
+                <TabItem Header="📶  Speed Test" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsSpeedTestVisible, Converter={StaticResource BoolToVis}}">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>   <!-- toolbar -->
+                    <RowDefinition Height="Auto"/>   <!-- metric cards -->
+                    <RowDefinition Height="Auto"/>   <!-- progress + status -->
+                    <RowDefinition Height="*"/>      <!-- filler -->
+                </Grid.RowDefinitions>
+
+                <!-- Toolbar -->
+                <Border Grid.Row="0" Background="#455A64" Padding="8,6">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Server:" VerticalAlignment="Center"
+                                   FontSize="13" Foreground="White" Margin="0,0,8,0"/>
+                        <ComboBox ItemsSource="{Binding SpeedTestVM.Servers}"
+                                  SelectedItem="{Binding SpeedTestVM.SelectedServer}"
+                                  Height="28" FontSize="12" Width="180" Margin="0,0,12,0"
+                                  Style="{StaticResource DarkComboBox}"/>
+                        <Button Content="▶  Run"
+                                Command="{Binding SpeedTestVM.StartCommand}"
+                                Background="#43A047" Padding="14,4" Margin="0,0,4,0"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="⏹  Cancel"
+                                Command="{Binding SpeedTestVM.CancelCommand}"
+                                Background="#FB8C00" Padding="14,4"
+                                Style="{StaticResource ActionButton}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Metric cards -->
+                <Grid Grid.Row="1" Margin="24,20,24,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Ping card -->
+                    <Border Grid.Column="0" Background="White" BorderBrush="#CFD8DC"
+                            BorderThickness="1" CornerRadius="8" Padding="20,16">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="⏱  Ping" Foreground="#546E7A" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SpeedTestVM.PingMs, StringFormat={}{0:F1}}"
+                                       FontSize="44" FontWeight="Bold" Foreground="#FF7043"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            <TextBlock Text="ms" Foreground="#90A4AE" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SpeedTestVM.JitterMs, StringFormat=Jitter: {0:F1} ms}"
+                                       Foreground="#BDBDBD" FontSize="11"
+                                       HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Download card -->
+                    <Border Grid.Column="2" Background="White" BorderBrush="#CFD8DC"
+                            BorderThickness="1" CornerRadius="8" Padding="20,16">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="⬇  Download" Foreground="#546E7A" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SpeedTestVM.DownloadMbps, StringFormat={}{0:F1}}"
+                                       FontSize="44" FontWeight="Bold" Foreground="#1E88E5"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            <TextBlock Text="Mbps" Foreground="#90A4AE" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Upload card -->
+                    <Border Grid.Column="4" Background="White" BorderBrush="#CFD8DC"
+                            BorderThickness="1" CornerRadius="8" Padding="20,16">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="⬆  Upload" Foreground="#546E7A" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SpeedTestVM.UploadMbps, StringFormat={}{0:F1}}"
+                                       FontSize="44" FontWeight="Bold" Foreground="#43A047"
+                                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                            <TextBlock Text="Mbps" Foreground="#90A4AE" FontSize="13"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="(Cloudflare only)" Foreground="#BDBDBD" FontSize="10"
+                                       HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Progress bar + status text -->
+                <Grid Grid.Row="2" Margin="24,0,24,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <ProgressBar Grid.Row="0" Height="10"
+                                 Value="{Binding SpeedTestVM.ProgressPercent}" Maximum="100"
+                                 Background="#E0E0E0" Foreground="#1E88E5" Margin="0,0,0,8"/>
+                    <TextBlock Grid.Row="1" Text="{Binding SpeedTestVM.StatusText}"
+                               FontSize="13" Foreground="#546E7A"
+                               HorizontalAlignment="Center"/>
+                </Grid>
+            </Grid>
+        </TabItem>
+
+                <!-- ─────────────────── MTU Discovery ─────────────────── -->
+                <TabItem Header="📏  MTU" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsMtuVisible, Converter={StaticResource BoolToVis}}">
+            <Grid Margin="16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Input row -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="Target:" VerticalAlignment="Center"
+                               FontSize="13" Foreground="#546E7A" Margin="0,0,8,0"/>
+
+                    <ComboBox Grid.Column="1" IsEditable="True"
+                              Text="{Binding MtuDiscoveryVM.Host, UpdateSourceTrigger=PropertyChanged}"
+                              ItemsSource="{Binding MtuDiscoveryVM.AllHosts}"
+                              Height="32" FontSize="13" Width="170" Margin="0,0,8,0"
+                              Style="{StaticResource DarkComboBox}"
+                              VerticalContentAlignment="Center"/>
+
+                    <Button Grid.Column="2" Content="▶  Discover"
+                            Command="{Binding MtuDiscoveryVM.RunCommand}"
+                            Background="#43A047" Padding="14,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+                    <Button Grid.Column="3" Content="⏹  Cancel"
+                            Command="{Binding MtuDiscoveryVM.CancelCommand}"
+                            Background="#FB8C00" Padding="14,5" Margin="0,0,4,0"
+                            Style="{StaticResource ActionButton}"/>
+                    <Button Grid.Column="4" Content="🗑  Clear"
+                            Command="{Binding MtuDiscoveryVM.ClearCommand}"
+                            Background="#546E7A" Padding="14,5"
+                            Style="{StaticResource ActionButton}"/>
+                </Grid>
+
+                <!-- Output pane -->
+                <Border Grid.Row="1" Background="White" BorderBrush="#CFD8DC"
+                        BorderThickness="1" CornerRadius="4">
+                    <ScrollViewer x:Name="MtuScroll"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="MtuOutput"
+                                   Text="{Binding MtuDiscoveryVM.Output}"
+                                   FontFamily="Consolas" FontSize="13"
+                                   Foreground="#263238" Padding="12"
+                                   TextWrapping="NoWrap"/>
+                    </ScrollViewer>
+                </Border>
+
+        <!-- Result banner -->
+                <Border Grid.Row="2" Margin="0,8,0,0"
+                        Background="#E8F5E9" BorderBrush="#A5D6A7" BorderThickness="1"
+                        CornerRadius="4" Padding="12,8">
+                    <TextBlock Text="{Binding MtuDiscoveryVM.ResultText}"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#2E7D32"
+                               HorizontalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </TabItem>
+
+            </TabControl>
+        </TabItem>
+
+        <!-- ══════════════════════ Connectivity &amp; Reachability Tab ══════════════════════ -->
+        <TabItem Header="🔗  Connectivity"
+                 Visibility="{Binding SettingsVM.IsConnectivityVisible, Converter={StaticResource BoolToVis}}">
+            <TabControl Style="{StaticResource InnerTabControl}">
+
+                <!-- ─────────────────── HTTP/HTTPS Check ─────────────────── -->
+                <TabItem Header="🌐  HTTP Check" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsHttpCheckVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid Margin="14" DataContext="{Binding ConnectivityVM.HttpCheck}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>  <!-- toolbar row -->
+                            <RowDefinition Height="Auto"/>  <!-- result summary -->
+                            <RowDefinition Height="*"/>     <!-- headers / redirect chain -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <Border Grid.Row="0" Background="#455A64" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Address" Foreground="White"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                <ComboBox Grid.Column="1" IsEditable="True"
+                                          Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding AllUrls}"
+                                          Margin="0,0,8,0"
+                                          Style="{StaticResource DarkComboBox}"
+                                          ToolTip="Enter URL (e.g. https://example.com)">
+                                    <ComboBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding CheckCommand}"/>
+                                    </ComboBox.InputBindings>
+                                </ComboBox>
+
+                                <CheckBox Grid.Column="4" Content="Follow Redirects"
+                                          IsChecked="{Binding FollowRedirects}"
+                                          Foreground="White" Margin="0,0,10,0"
+                                          VerticalAlignment="Center"/>
+
+                                <Button Grid.Column="5" Content="▶  Check" Margin="0,0,4,0"
+                                        Command="{Binding CheckCommand}"
+                                        Background="#1E88E5" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                                <Button Grid.Column="6" Content="⏹  Cancel" Margin="0,0,4,0"
+                                        Command="{Binding CancelCommand}"
+                                        Background="#E53935" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                                <Button Grid.Column="7" Content="🗑  Clear"
+                                        Command="{Binding ClearCommand}"
+                                        Background="#546E7A" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Result summary -->
+                        <Border Grid.Row="1" Margin="0,0,0,10" Padding="12,8"
+                                BorderThickness="1" CornerRadius="4"
+                                Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Background" Value="#F5F5F5"/>
+                                    <Setter Property="BorderBrush" Value="#B0BEC5"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding StatusGroup}" Value="Success">
+                                            <Setter Property="Background"   Value="#E8F5E9"/>
+                                            <Setter Property="BorderBrush"  Value="#A5D6A7"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusGroup}" Value="Redirect">
+                                            <Setter Property="Background"   Value="#E3F2FD"/>
+                                            <Setter Property="BorderBrush"  Value="#90CAF9"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusGroup}" Value="ClientError">
+                                            <Setter Property="Background"   Value="#FFF3E0"/>
+                                            <Setter Property="BorderBrush"  Value="#FFCC80"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusGroup}" Value="ServerError">
+                                            <Setter Property="Background"   Value="#FFEBEE"/>
+                                            <Setter Property="BorderBrush"  Value="#EF9A9A"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding StatusGroup}" Value="Error">
+                                            <Setter Property="Background"   Value="#FFEBEE"/>
+                                            <Setter Property="BorderBrush"  Value="#EF9A9A"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Status code badge -->
+                                <Border Grid.Column="0" CornerRadius="3" Padding="8,2" Margin="0,0,12,0"
+                                        Visibility="{Binding StatusCode, Converter={StaticResource BoolToVis}}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="#78909C"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding StatusGroup}" Value="Success">
+                                                    <Setter Property="Background" Value="#43A047"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusGroup}" Value="Redirect">
+                                                    <Setter Property="Background" Value="#1E88E5"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusGroup}" Value="ClientError">
+                                                    <Setter Property="Background" Value="#FB8C00"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusGroup}" Value="ServerError">
+                                                    <Setter Property="Background" Value="#E53935"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding StatusGroup}" Value="Error">
+                                                    <Setter Property="Background" Value="#E53935"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <TextBlock FontSize="18" FontWeight="Bold" Foreground="White"
+                                               Text="{Binding StatusCode}"/>
+                                </Border>
+
+                                <TextBlock Grid.Column="1" FontSize="14" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" Margin="0,0,16,0"
+                                           Text="{Binding StatusDesc}" Foreground="#37474F"/>
+
+                                <TextBlock Grid.Column="2" FontSize="13" VerticalAlignment="Center"
+                                           Foreground="#546E7A" Margin="0,0,16,0"
+                                           Text="{Binding ResponseTimeMs, StringFormat={}{0} ms}"/>
+
+                                <TextBlock Grid.Column="3" FontSize="12" VerticalAlignment="Center"
+                                           Foreground="#607D8B" TextTrimming="CharacterEllipsis"
+                                           Text="{Binding FinalUrl}"/>
+
+                                <TextBlock Grid.Column="4" FontSize="13" VerticalAlignment="Center"
+                                           Foreground="#E53935" TextWrapping="Wrap"
+                                           Visibility="{Binding ErrorMessage, Converter={StaticResource BoolToVis}}"
+                                           Text="{Binding ErrorMessage}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Redirect chain + headers (two-column) -->
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="3*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Redirect chain -->
+                            <Border Grid.Column="0" Margin="0,0,6,0" Background="White"
+                                    BorderBrush="#CFD8DC" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" Background="#ECEFF1" Padding="8,4">
+                                        <TextBlock Text="Redirect Chain" FontSize="12"
+                                                   FontWeight="SemiBold" Foreground="#546E7A"/>
+                                    </Border>
+                                    <ListBox Grid.Row="1" ItemsSource="{Binding RedirectChain}"
+                                             FontFamily="Consolas" FontSize="12"
+                                             Background="Transparent" BorderThickness="0"
+                                             ScrollViewer.HorizontalScrollBarVisibility="Auto"/>
+                                </Grid>
+                            </Border>
+
+                            <!-- Response headers -->
+                            <Border Grid.Column="1" Margin="6,0,0,0" Background="White"
+                                    BorderBrush="#CFD8DC" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" Background="#ECEFF1" Padding="8,4">
+                                        <TextBlock Text="Response Headers" FontSize="12"
+                                                   FontWeight="SemiBold" Foreground="#546E7A"/>
+                                    </Border>
+                                    <DataGrid Grid.Row="1"
+                                              ItemsSource="{Binding Headers}"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True" CanUserResizeRows="False"
+                                              GridLinesVisibility="Horizontal"
+                                              Background="Transparent" BorderThickness="0"
+                                              RowBackground="White" AlternatingRowBackground="#F9FBE7">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Header" Binding="{Binding Name}"
+                                                                Width="180" FontWeight="SemiBold"/>
+                                            <DataGridTextColumn Header="Value"  Binding="{Binding Value}"
+                                                                Width="*"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─────────────────── SSL/TLS Inspector ─────────────────── -->
+                <TabItem Header="🔐  SSL / TLS" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsSslVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid Margin="14" DataContext="{Binding ConnectivityVM.SslInspector}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <Border Grid.Row="0" Background="#455A64" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Address" Foreground="White"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                <ComboBox Grid.Column="1" IsEditable="True"
+                                          Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding AllDomains}"
+                                          Margin="0,0,8,0"
+                                          Style="{StaticResource DarkComboBox}"
+                                          ToolTip="Domain or IP">
+                                    <ComboBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding InspectCommand}"/>
+                                    </ComboBox.InputBindings>
+                                </ComboBox>
+
+                                <TextBlock Grid.Column="4" Text="Port:" Foreground="White"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <local:NumericUpDown Grid.Column="5"
+                                                     Value="{Binding Port, Mode=TwoWay}"
+                                                     Minimum="1" Maximum="65535" Step="1"
+                                                     Width="72" Margin="0,0,8,0"/>
+
+                                <Button Grid.Column="6" Content="▶  Inspect" Margin="0,0,4,0"
+                                        Command="{Binding InspectCommand}"
+                                        Background="#1E88E5" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                                <Button Grid.Column="7" Content="⏹  Cancel"
+                                        Command="{Binding CancelCommand}"
+                                        Background="#E53935" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Expiry banner -->
+                        <Border Grid.Row="1" Margin="0,0,0,10" Padding="12,8"
+                                BorderThickness="1" CornerRadius="4"
+                                Visibility="{Binding HasResult, Converter={StaticResource BoolToVis}}">
+                            <Border.Style>
+                                <Style TargetType="Border">
+                                    <Setter Property="Visibility"   Value="Collapsed"/>
+                                    <Setter Property="Background"   Value="#F5F5F5"/>
+                                    <Setter Property="BorderBrush"  Value="#B0BEC5"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ExpiryStatus}" Value="Good">
+                                            <Setter Property="Visibility"  Value="Visible"/>
+                                            <Setter Property="Background"  Value="#E8F5E9"/>
+                                            <Setter Property="BorderBrush" Value="#A5D6A7"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ExpiryStatus}" Value="Warning">
+                                            <Setter Property="Visibility"  Value="Visible"/>
+                                            <Setter Property="Background"  Value="#FFF8E1"/>
+                                            <Setter Property="BorderBrush" Value="#FFE082"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ExpiryStatus}" Value="Critical">
+                                            <Setter Property="Visibility"  Value="Visible"/>
+                                            <Setter Property="Background"  Value="#FFF3E0"/>
+                                            <Setter Property="BorderBrush" Value="#FFCC80"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding ExpiryStatus}" Value="Expired">
+                                            <Setter Property="Visibility"  Value="Visible"/>
+                                            <Setter Property="Background"  Value="#FFEBEE"/>
+                                            <Setter Property="BorderBrush" Value="#EF9A9A"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Border.Style>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding ExpiryBanner}"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#37474F"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ExpiryStatus}" Value="Good">
+                                                    <Setter Property="Foreground" Value="#2E7D32"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ExpiryStatus}" Value="Warning">
+                                                    <Setter Property="Foreground" Value="#F57F17"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ExpiryStatus}" Value="Critical">
+                                                    <Setter Property="Foreground" Value="#E65100"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ExpiryStatus}" Value="Expired">
+                                                    <Setter Property="Foreground" Value="#B71C1C"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Grid.Column="1" Text="{Binding ErrorMessage}"
+                                           Foreground="#E53935" FontSize="13"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Cert properties + chain (two-column) -->
+                        <Grid Grid.Row="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="3*"/>
+                                <ColumnDefinition Width="2*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Certificate properties -->
+                            <Border Grid.Column="0" Margin="0,0,6,0" Background="White"
+                                    BorderBrush="#CFD8DC" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" Background="#ECEFF1" Padding="8,4">
+                                        <TextBlock Text="Certificate Properties" FontSize="12"
+                                                   FontWeight="SemiBold" Foreground="#546E7A"/>
+                                    </Border>
+                                    <DataGrid Grid.Row="1"
+                                              ItemsSource="{Binding CertProperties}"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True" CanUserResizeRows="False"
+                                              GridLinesVisibility="Horizontal"
+                                              Background="Transparent" BorderThickness="0"
+                                              RowBackground="White" AlternatingRowBackground="#E3F2FD">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="Field" Binding="{Binding Name}"
+                                                                Width="160" FontWeight="SemiBold"/>
+                                            <DataGridTextColumn Header="Value" Binding="{Binding Value}"
+                                                                Width="*">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="TextWrapping" Value="Wrap"/>
+                                                        <Setter Property="Padding" Value="2"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+
+                            <!-- Chain -->
+                            <Border Grid.Column="1" Margin="6,0,0,0" Background="White"
+                                    BorderBrush="#CFD8DC" BorderThickness="1" CornerRadius="4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Grid.Row="0" Background="#ECEFF1" Padding="8,4">
+                                        <TextBlock Text="Trust Chain" FontSize="12"
+                                                   FontWeight="SemiBold" Foreground="#546E7A"/>
+                                    </Border>
+                                    <DataGrid Grid.Row="1"
+                                              ItemsSource="{Binding CertChain}"
+                                              AutoGenerateColumns="False"
+                                              IsReadOnly="True" CanUserResizeRows="False"
+                                              GridLinesVisibility="Horizontal"
+                                              Background="Transparent" BorderThickness="0"
+                                              RowBackground="White" AlternatingRowBackground="#F3E5F5">
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="#"       Binding="{Binding Index}"       Width="28"/>
+                                            <DataGridTextColumn Header="Subject" Binding="{Binding SubjectCN}"   Width="*"/>
+                                            <DataGridTextColumn Header="Issuer"  Binding="{Binding IssuerCN}"    Width="*"/>
+                                            <DataGridTextColumn Header="Expires" Binding="{Binding ValidToDisplay}" Width="90"/>
+                                            <DataGridTextColumn Header="Days"    Binding="{Binding DaysLeft}"    Width="50"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─────────────────── WHOIS Lookup ─────────────────── -->
+                <TabItem Header="📋  WHOIS" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsWhoisVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid Margin="14" DataContext="{Binding ConnectivityVM.Whois}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Toolbar -->
+                        <Border Grid.Row="0" Background="#455A64" CornerRadius="4" Padding="10,8" Margin="0,0,0,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Address" Foreground="White"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+
+                                <ComboBox Grid.Column="1" IsEditable="True"
+                                          Text="{Binding Target, UpdateSourceTrigger=PropertyChanged}"
+                                          ItemsSource="{Binding AllHosts}"
+                                          Margin="0,0,8,0"
+                                          Style="{StaticResource DarkComboBox}"
+                                          ToolTip="Domain (example.com) or IP (8.8.8.8)">
+                                    <ComboBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding LookupCommand}"/>
+                                    </ComboBox.InputBindings>
+                                </ComboBox>
+
+                                <Button Grid.Column="4" Content="▶  Lookup" Margin="0,0,4,0"
+                                        Command="{Binding LookupCommand}"
+                                        Background="#1E88E5" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                                <Button Grid.Column="5" Content="⏹  Cancel" Margin="0,0,4,0"
+                                        Command="{Binding CancelCommand}"
+                                        Background="#E53935" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                                <Button Grid.Column="6" Content="🗑  Clear"
+                                        Command="{Binding ClearCommand}"
+                                        Background="#546E7A" Padding="12,5"
+                                        Style="{StaticResource ActionButton}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Output pane -->
+                        <Border Grid.Row="1" Background="White" BorderBrush="#CFD8DC"
+                                BorderThickness="1" CornerRadius="4">
+                            <ScrollViewer x:Name="WhoisScroll"
+                                          VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Auto">
+                                <TextBlock Text="{Binding Output}"
+                                           FontFamily="Consolas" FontSize="12"
+                                           Foreground="#263238" Padding="12"
+                                           TextWrapping="NoWrap"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
+        </TabItem>
+
+        <!-- ══════════════════ Reporting Tab ══════════════════ -->
+        <TabItem Header="📤  Reporting"
+                 Visibility="{Binding SettingsVM.IsReportingVisible, Converter={StaticResource BoolToVis}}">
+            <TabControl Style="{StaticResource InnerTabControl}">
+
+                <!-- ─── Export Results ─── -->
+                <TabItem Header="💾  Export" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsExportVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding ReportingVM.ExportVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Grid.Row="0" Background="#1E2A32" CornerRadius="6" Margin="8,8,8,6" Padding="14,10">
+                            <StackPanel>
+                                <TextBlock Text="Export Diagnostics" Foreground="#80CBC4" FontSize="14"
+                                           FontWeight="SemiBold" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <TextBlock Text="Format:" VerticalAlignment="Center" Foreground="#B0BEC5" Width="70"/>
+                                    <ComboBox ItemsSource="{x:Static vm:ExportResultsViewModel.Formats}"
+                                              SelectedItem="{Binding SelectedFormat}" Width="140"
+                                              Style="{StaticResource DarkComboBox}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                    <Button Content="📁 Export Now" Command="{Binding ExportCommand}"
+                                            Style="{StaticResource ActionButton}" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding StatusMessage}" VerticalAlignment="Center" Foreground="#90A4AE"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <TextBlock Grid.Row="1" Foreground="#546E7A" FontSize="11" Margin="12,0,12,4"
+                                   Text="Exports all active ping monitors to the selected format and opens the file."/>
+
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding Entries}" AutoGenerateColumns="False" IsReadOnly="True"
+                                  Background="#1A2330" RowBackground="#1E2A30" AlternatingRowBackground="#1A2430"
+                                  Foreground="#ECEFF1" BorderBrush="#37474F"
+                                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,8">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Host"    Binding="{Binding Name}"            Width="160"/>
+                                <DataGridTextColumn Header="IP"      Binding="{Binding IpAddress}"       Width="130"/>
+                                <DataGridTextColumn Header="Sent"    Binding="{Binding SentCount}"       Width="60"/>
+                                <DataGridTextColumn Header="OK"      Binding="{Binding SuccessCount}"    Width="60"/>
+                                <DataGridTextColumn Header="Fail"    Binding="{Binding FailCount}"       Width="60"/>
+                                <DataGridTextColumn Header="Last RTT" Binding="{Binding LastRttDisplay}" Width="80"/>
+                                <DataGridTextColumn Header="Status"  Binding="{Binding Status}"          Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── Scheduled Tests ─── -->
+                <TabItem Header="⏱  Scheduled Tests" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsScheduledTestsVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding ReportingVM.ScheduledVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- Add form -->
+                        <Border Grid.Row="0" Background="#1E2A32" CornerRadius="6" Margin="8,8,8,4" Padding="14,10">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>  <!-- labels -->
+                                    <ColumnDefinition Width="*"/>     <!-- controls -->
+                                    <ColumnDefinition Width="Auto"/>  <!-- labels -->
+                                    <ColumnDefinition Width="*"/>     <!-- controls -->
+                                    <ColumnDefinition Width="Auto"/>  <!-- buttons -->
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Row 0 — Name + Host -->
+                                <TextBlock Grid.Row="0" Grid.Column="0"
+                                           Text="Name" Foreground="#ECEFF1" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <TextBox   Grid.Row="0" Grid.Column="1"
+                                           Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}"
+                                           MinWidth="130" Margin="0,0,16,0" Padding="6,4"
+                                           Background="#2D2D2D" Foreground="#ECEFF1" BorderBrush="#546E7A"
+                                           ToolTip="Friendly name for this scheduled test"/>
+
+                                <TextBlock Grid.Row="0" Grid.Column="2"
+                                           Text="Host / URL" Foreground="#ECEFF1" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <ComboBox  Grid.Row="0" Grid.Column="3"
+                                           IsEditable="True"
+                                           Text="{Binding EditHost, UpdateSourceTrigger=PropertyChanged}"
+                                           ItemsSource="{Binding AllHosts}"
+                                           MinWidth="180" Margin="0,0,16,0"
+                                           Style="{StaticResource DarkComboBox}"
+                                           ToolTip="Host, IP address, or URL — choose from saved addresses or type a new one"/>
+
+                                <!-- Row 2 — Type + Port + Interval + buttons -->
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Text="Type" Foreground="#ECEFF1" FontSize="11"
+                                           VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Margin="0,0,16,0">
+                                    <ComboBox ItemsSource="{x:Static vm:ScheduledTestsViewModel.TestTypes}"
+                                              SelectedItem="{Binding EditType}"
+                                              Width="90"
+                                              Style="{StaticResource DarkComboBox}"
+                                              ToolTip="Test type"/>
+                                </StackPanel>
+
+                                <!-- Port · gap · Every — all in col 2-3 as a StackPanel -->
+                                <StackPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2"
+                                            Orientation="Horizontal" VerticalAlignment="Center"
+                                            Margin="0,0,16,0">
+                                    <TextBlock Text="Port" Foreground="#ECEFF1" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <local:NumericUpDown Value="{Binding EditPort, Mode=TwoWay}"
+                                                         Minimum="1" Maximum="65535" Step="1"
+                                                         Width="72"/>
+                                    <TextBlock Text="Every" Foreground="#ECEFF1" FontSize="11"
+                                               VerticalAlignment="Center" Margin="20,0,6,0"/>
+                                    <local:NumericUpDown Value="{Binding EditIntervalMinutes, Mode=TwoWay}"
+                                                         Minimum="1" Maximum="10080" Step="1"
+                                                         Width="64"/>
+                                    <TextBlock Text="min" Foreground="#B0BEC5" FontSize="11"
+                                               VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
+
+                                <!-- Action buttons span both rows -->
+                                <StackPanel Grid.Row="0" Grid.RowSpan="3" Grid.Column="4"
+                                            Orientation="Vertical" VerticalAlignment="Center">
+                                    <Button Content="➕  Add"    Command="{Binding AddCommand}"
+                                            Style="{StaticResource StartButton}"  Margin="0,0,0,4" MinWidth="90"/>
+                                    <Button Content="💾  Save"   Command="{Binding SaveCommand}"
+                                            Style="{StaticResource RefreshButton}" Margin="0,0,0,4" MinWidth="90"/>
+                                    <Button Content="🗑  Remove" Command="{Binding RemoveCommand}"
+                                            Style="{StaticResource ClearButton}"  MinWidth="90"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="1" Background="#141E26" CornerRadius="4" Margin="8,0,8,4" Padding="8,4">
+                            <TextBlock Text="{Binding Alerts}" Foreground="#EF9A9A" FontSize="11"
+                                       TextWrapping="Wrap"/>
+                        </Border>
+
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding Tests}" SelectedItem="{Binding Selected}"
+                                  AutoGenerateColumns="False" IsReadOnly="True"
+                                  Background="#1A2330" RowBackground="#1E2A30" AlternatingRowBackground="#1A2430"
+                                  Foreground="#ECEFF1" BorderBrush="#37474F"
+                                  GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Name"       Binding="{Binding Name}"              Width="120"/>
+                                <DataGridTextColumn Header="Host"       Binding="{Binding Host}"              Width="160"/>
+                                <DataGridTextColumn Header="Type"       Binding="{Binding TestType}"          Width="70"/>
+                                <DataGridTextColumn Header="Port"       Binding="{Binding Port}"              Width="55"/>
+                                <DataGridTextColumn Header="Every"      Binding="{Binding IntervalMinutes}"   Width="55"/>
+                                <DataGridTextColumn Header="Last Run"   Binding="{Binding LastRunDisplay}"    Width="100"/>
+                                <DataGridTextColumn Header="Result"     Binding="{Binding LastStatus}"        Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="3" Text="Scheduler checks every 30 s. Click a row to load it into the form for editing."
+                                   Foreground="#546E7A" FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+                <!-- ─── Historical Comparison ─── -->
+                <TabItem Header="📊  Historical Comparison" Style="{StaticResource InnerTabItem}"
+                         Visibility="{Binding SettingsVM.IsHistoricalComparisonVisible, Converter={StaticResource BoolToVis}}">
+                    <Grid DataContext="{Binding ReportingVM.HistoryVM}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
+                            <Button Content="📸 Save Baseline" Command="{Binding SaveBaselineCommand}"
+                                    Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <Button Content="🔄 Compare Now" Command="{Binding CompareCommand}"
+                                    Style="{StaticResource ActionButton}" Margin="0,0,4,0"/>
+                            <Button Content="🗑 Clear Baseline" Command="{Binding ClearBaselineCommand}"
+                                    Style="{StaticResource ActionButton}"/>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Background="#1E2A32" CornerRadius="4" Margin="8,0,8,4" Padding="8,4">
+                            <TextBlock Text="{Binding BaselineInfo}" Foreground="#90A4AE" FontSize="11"/>
+                        </Border>
+
+                        <DataGrid Grid.Row="2" ItemsSource="{Binding Rows}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
+                                  AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
+                                  BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="Host"      Binding="{Binding Name}"       Width="150"/>
+                                <DataGridTextColumn Header="IP"        Binding="{Binding IpAddress}"  Width="130"/>
+                                <DataGridTextColumn Header="Base Loss" Binding="{Binding BaseLoss}"   Width="90"/>
+                                <DataGridTextColumn Header="Cur Loss"  Binding="{Binding CurLoss}"    Width="90"/>
+                                <DataGridTextColumn Header="Base RTT"  Binding="{Binding BaseRtt}"    Width="80"/>
+                                <DataGridTextColumn Header="Cur RTT"   Binding="{Binding CurRtt}"     Width="80"/>
+                                <DataGridTextColumn Header="Δ"         Binding="{Binding Delta}"      Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ChangeClass}" Value="better">
+                                                    <Setter Property="Foreground" Value="#A5D6A7"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding ChangeClass}" Value="worse">
+                                                    <Setter Property="Foreground" Value="#EF9A9A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock Grid.Row="3" Text="{Binding StatusText}" Foreground="#546E7A"
+                                   FontSize="11" Margin="10,2,10,6"/>
+                    </Grid>
+                </TabItem>
+
+            </TabControl>
+        </TabItem>
+
+
+        <!-- ═══════════════════════════ Settings Tab ════════════════════════════ -->
+        <TabItem Header="⚙  Settings">
+            <Grid Margin="20">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Heading -->
+                <TextBlock Grid.Row="0"
+                           Text="Settings"
+                           FontSize="20"
+                           FontWeight="SemiBold"
+                           Foreground="#37474F"
+                           Margin="0,0,0,20"/>
+
+                <!-- Visible Tabs section -->
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="Visible Tabs"
+                               FontSize="14"
+                               FontWeight="SemiBold"
+                               Foreground="#546E7A"
+                               Margin="0,0,0,4"/>
+                    <TextBlock Text="The Ping tab is always visible and cannot be hidden."
+                               FontSize="12"
+                               Foreground="#78909C"
+                               Margin="0,0,0,12"/>
+
+                    <!-- Dropdown toggle + popup -->
+                    <Grid HorizontalAlignment="Left">
+                        <ToggleButton x:Name="TabsDropdownToggle"
+                                      Content="▾  Configure Visible Tabs"
+                                      Style="{StaticResource DropdownToggleButton}"
+                                      MinWidth="220"/>
+
+                        <Popup IsOpen="{Binding IsChecked, ElementName=TabsDropdownToggle, Mode=TwoWay}"
+                               PlacementTarget="{Binding ElementName=TabsDropdownToggle}"
+                               Placement="Bottom"
+                               StaysOpen="False"
+                               AllowsTransparency="True"
+                               PopupAnimation="Fade">
+                            <Border Background="White"
+                                    BorderBrush="#B0BEC5"
+                                    BorderThickness="1"
+                                    CornerRadius="4"
+                                    Padding="4"
+                                    MinWidth="240"
+                                    Effect="{StaticResource DropShadow}">
+                                <TreeView ItemsSource="{Binding SettingsVM.Tabs}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          Focusable="False">
+                                    <TreeView.ItemContainerStyle>
+                                        <Style TargetType="TreeViewItem">
+                                            <Setter Property="IsExpanded" Value="True"/>
+                                            <Setter Property="Focusable" Value="False"/>
+                                            <Setter Property="Background" Value="Transparent"/>
+                                            <Setter Property="Padding" Value="0"/>
+                                            <Setter Property="Margin" Value="0"/>
+                                        </Style>
+                                    </TreeView.ItemContainerStyle>
+                                    <TreeView.ItemTemplate>
+                                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                            <!-- Parent tab row -->
+                                            <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                      FontSize="13"
+                                                      FontWeight="SemiBold"
+                                                      Foreground="#263238"
+                                                      Padding="4,2"
+                                                      Cursor="Hand">
+                                                <CheckBox.Content>
+                                                    <TextBlock Text="{Binding Name}" FontSize="13"/>
+                                                </CheckBox.Content>
+                                            </CheckBox>
+                                            <!-- Child sub-tab rows -->
+                                            <HierarchicalDataTemplate.ItemTemplate>
+                                                <DataTemplate>
+                                                    <CheckBox IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                              IsEnabled="{Binding IsEnabled}"
+                                                              FontSize="12"
+                                                              Foreground="#546E7A"
+                                                              Padding="4,1"
+                                                              Margin="8,0,0,0"
+                                                              Cursor="Hand">
+                                                        <CheckBox.Content>
+                                                            <TextBlock Text="{Binding Name}" FontSize="12"/>
+                                                        </CheckBox.Content>
+                                                    </CheckBox>
+                                                </DataTemplate>
+                                            </HierarchicalDataTemplate.ItemTemplate>
+                                        </HierarchicalDataTemplate>
+                                    </TreeView.ItemTemplate>
+                                </TreeView>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+
+    </TabControl>
+</Window>
+
