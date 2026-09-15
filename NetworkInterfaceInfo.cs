@@ -14,4 +14,12 @@ public class NetworkInterfaceInfo
     public string IPv6Address { get; init; } = "";
     public string DnsServers  { get; init; } = "";
     public string Speed       { get; init; } = "";
+
+    /// <summary>For "Add to Ping List" context-menu — targets the interface's IPv4 address.</summary>
+    public ViewModels.PingTargetArg? IPv4PingTarget =>
+        string.IsNullOrWhiteSpace(IPv4Address) ? null : new ViewModels.PingTargetArg(IPv4Address, Name);
+
+    /// <summary>For "Add to Ping List" context-menu — targets the default gateway.</summary>
+    public ViewModels.PingTargetArg? GatewayPingTarget =>
+        string.IsNullOrWhiteSpace(Gateway) ? null : new ViewModels.PingTargetArg(Gateway, $"{Name} Gateway");
 }

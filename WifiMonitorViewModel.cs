@@ -67,17 +67,17 @@ public class WifiMonitorViewModel : ViewModelBase
     public WifiMonitorViewModel()
     {
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(_intervalSec) };
-        _timer.Tick += (_, _) => Poll();
+        _timer.Tick += async (_, _) => await PollAsync();
 
-        StartCommand   = new RelayCommand(() => { IsRunning = true;  _timer.Start(); Poll(); }, () => !IsRunning);
-        StopCommand    = new RelayCommand(() => { IsRunning = false; _timer.Stop();          }, () => IsRunning);
-        RefreshCommand = new RelayCommand(Poll);
+        StartCommand   = new RelayCommand(() => { IsRunning = true;  _timer.Start(); _ = PollAsync(); }, () => !IsRunning);
+        StopCommand    = new RelayCommand(() => { IsRunning = false; _timer.Stop();                   }, () => IsRunning);
+        RefreshCommand = new RelayCommand(() => _ = PollAsync());
         ClearCommand   = new RelayCommand(() => { SignalSamples.Clear(); StatusText = "Cleared"; });
 
-        Poll(); // initial read
+        _ = PollAsync(); // initial read
     }
 
-    private void Poll()
+    private async Task PollAsync()
     {
         try
         {
@@ -87,10 +87,16 @@ public class WifiMonitorViewModel : ViewModelBase
                 RedirectStandardOutput = true,
                 CreateNoWindow         = true
             };
-            using var proc = Process.Start(psi)!;
-            var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit();
 
+            var output = await Task.Run(() =>
+            {
+                using var proc = Process.Start(psi)!;
+                var result = proc.StandardOutput.ReadToEnd();
+                proc.WaitForExit();
+                return result;
+            });
+
+            // output captured on background thread; parse and update on UI thread
             var fields = ParseNetsh(output);
 
             if (!fields.TryGetValue("SSID", out var ssid) || string.IsNullOrWhiteSpace(ssid))
@@ -104,12 +110,12 @@ public class WifiMonitorViewModel : ViewModelBase
 
             NoWifiMsg = "";
             Ssid      = ssid;
-            Bssid     = fields.GetValueOrDefault("BSSID", "—");
-            RadioType = fields.GetValueOrDefault("Radio type", "—");
-            Channel   = fields.GetValueOrDefault("Channel", "—");
-            RxMbps    = fields.GetValueOrDefault("Receive rate (Mbps)", "—");
-            TxMbps    = fields.GetValueOrDefault("Transmit rate (Mbps)", "—");
-            Auth      = fields.GetValueOrDefault("Authentication", "—");
+            Bssid     = GetValueOrDefault(fields, "BSSID", "—");
+            RadioType = GetValueOrDefault(fields, "Radio type", "—");
+            Channel   = GetValueOrDefault(fields, "Channel", "—");
+            RxMbps    = GetValueOrDefault(fields, "Receive rate (Mbps)", "—");
+            TxMbps    = GetValueOrDefault(fields, "Transmit rate (Mbps)", "—");
+            Auth      = GetValueOrDefault(fields, "Authentication", "—");
 
             if (fields.TryGetValue("Signal", out var sigStr))
             {
@@ -140,10 +146,13 @@ public class WifiMonitorViewModel : ViewModelBase
             var line = raw.TrimEnd();
             var idx  = line.IndexOf(':');
             if (idx < 1) continue;
-            var key = line[..idx].Trim();
-            var val = line[(idx + 1)..].Trim();
+            var key = line.Substring(0, idx).Trim();
+            var val = line.Substring(idx + 1).Trim();
             if (!string.IsNullOrEmpty(key)) dict[key] = val;
         }
         return dict;
     }
+
+    private static string GetValueOrDefault(Dictionary<string, string> dict, string key, string fallback)
+        => dict.TryGetValue(key, out var value) && !string.IsNullOrEmpty(value) ? value : fallback;
 }

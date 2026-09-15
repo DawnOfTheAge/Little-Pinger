@@ -70,7 +70,7 @@ public partial class PingGraphControl : UserControl
             if (samples[i].HasValue)
             {
                 double y = h - samples[i]!.Value / max * (h - 4) - 2;
-                pts.Add(new Point(x, Math.Clamp(y, 0, h)));
+                pts.Add(new Point(x, Clamp(y, 0, h)));
             }
             else
             {
@@ -82,4 +82,7 @@ public partial class PingGraphControl : UserControl
         }
         GraphLine.Points = pts;
     }
+
+    private static double Clamp(double value, double min, double max)
+        => value < min ? min : value > max ? max : value;
 }

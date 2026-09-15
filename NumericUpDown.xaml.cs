@@ -80,5 +80,5 @@ public partial class NumericUpDown : UserControl
             ValueBox.Text = Value.ToString(); // revert to last valid value
     }
 
-    private int Clamp(int v) => Math.Clamp(v, Minimum, Maximum);
+    private int Clamp(int v) => v < Minimum ? Minimum : v > Maximum ? Maximum : v;
 }

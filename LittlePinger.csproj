@@ -1,17 +1,55 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFrameworks>net8.0-windows;net472</TargetFrameworks>
     <UseWPF>true</UseWPF>
     <RootNamespace>LittlePinger</RootNamespace>
     <AssemblyName>LittlePinger</AssemblyName>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
     <ApplicationIcon>Resources\Little Pinger.ico</ApplicationIcon>
+    <BuildNumberFile>$(MSBuildProjectDirectory)\BuildNumber.txt</BuildNumberFile>
   </PropertyGroup>
+
+  <!-- Keep one version for both target frameworks when a multi-target build runs. -->
+  <Target Name="IncrementBuildNumber" BeforeTargets="BeforeBuild">
+    <ReadLinesFromFile File="$(BuildNumberFile)" Condition="Exists('$(BuildNumberFile)')">
+      <Output TaskParameter="Lines" ItemName="BuildNumberLines" />
+    </ReadLinesFromFile>
+    <PropertyGroup>
+      <CurrentBuildNumber Condition="'@(BuildNumberLines)' != ''">@(BuildNumberLines)</CurrentBuildNumber>
+      <CurrentBuildNumber Condition="'$(CurrentBuildNumber)' == ''">0</CurrentBuildNumber>
+      <NextBuildNumber Condition="'$(TargetFramework)' == 'net472'">$([MSBuild]::Add($(CurrentBuildNumber), 1))</NextBuildNumber>
+      <NextBuildNumber Condition="'$(TargetFramework)' != 'net472'">$(CurrentBuildNumber)</NextBuildNumber>
+      <Version>1.0.0.$(NextBuildNumber)</Version>
+      <AssemblyVersion>$(Version)</AssemblyVersion>
+      <FileVersion>$(Version)</FileVersion>
+    </PropertyGroup>
+    <WriteLinesToFile File="$(BuildNumberFile)" Lines="$(NextBuildNumber)"
+                      Overwrite="true" Condition="'$(TargetFramework)' == 'net472'" />
+  </Target>
+
+  <ItemGroup Condition="'$(TargetFramework)' == 'net472'">
+    <Reference Include="System.Net.Http" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Embed the icon as a WPF pack resource so Window.Icon can resolve it -->
     <Resource Include="Resources\Little Pinger.ico"/>
   </ItemGroup>
+
+  <!--
+    Post-build: sign LittlePinger.exe with the local code-signing certificate.
+    One-time setup: run Scripts\Create-LocalCert.ps1 as Administrator.
+    If the cert is not yet installed the script exits 0 and the build succeeds.
+  -->
+  <Target Name="SignOutput" AfterTargets="Build">
+    <Exec
+      Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)Scripts\Sign-Output.ps1&quot; -OutputDir &quot;$(TargetDir.TrimEnd('\'))&quot;"
+      ContinueOnError="true"
+      ConsoleToMSBuild="true"/>
+  </Target>
+
 </Project>

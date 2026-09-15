@@ -33,13 +33,13 @@ public class NetstatEntry
     {
         if (string.IsNullOrEmpty(addr) || addr == "*:*") return "";
         // IPv6 notation: [::1]:80 → strip brackets → ::1
-        if (addr.StartsWith('['))
+        if (addr.StartsWith("["))
         {
             var close = addr.IndexOf(']');
-            return close >= 0 ? addr[1..close] : addr;
+            return close > 1 ? addr.Substring(1, close - 1) : addr;
         }
         var lastColon = addr.LastIndexOf(':');
-        return lastColon > 0 ? addr[..lastColon] : addr;
+        return lastColon > 0 ? addr.Substring(0, lastColon) : addr;
     }
 }
 
@@ -136,10 +136,10 @@ public class NetstatViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(_searchText))
         {
             var s = _searchText.Trim();
-            if (!e.LocalAddress  .Contains(s, StringComparison.OrdinalIgnoreCase) &&
-                !e.ForeignAddress.Contains(s, StringComparison.OrdinalIgnoreCase) &&
-                !e.ProcessId.ToString().Contains(s, StringComparison.OrdinalIgnoreCase) &&
-                !e.Executable    .Contains(s, StringComparison.OrdinalIgnoreCase))
+            if (e.LocalAddress.IndexOf(s, StringComparison.OrdinalIgnoreCase) < 0 &&
+                e.ForeignAddress.IndexOf(s, StringComparison.OrdinalIgnoreCase) < 0 &&
+                e.ProcessId.ToString().IndexOf(s, StringComparison.OrdinalIgnoreCase) < 0 &&
+                e.Executable.IndexOf(s, StringComparison.OrdinalIgnoreCase) < 0)
                 return false;
         }
 
@@ -193,7 +193,11 @@ public class NetstatViewModel : ViewModelBase
             var list = new List<NetstatEntry>();
             using var proc = Process.Start(psi)!;
             var output = await proc.StandardOutput.ReadToEndAsync();
+#if NET472
+            await Task.Run(() => proc.WaitForExit());
+#else
             await proc.WaitForExitAsync();
+#endif
 
             foreach (var rawLine in output.Split('\n'))
             {
@@ -209,7 +213,7 @@ public class NetstatViewModel : ViewModelBase
                 if (proto == "TCP" && parts.Length >= 5)
                 {
                     // TCP: Proto  LocalAddr  ForeignAddr  State  PID
-                    if (!int.TryParse(parts[^1], out int pid)) continue;
+                    if (!int.TryParse(parts[parts.Length - 1], out int pid)) continue;
                     entry = new NetstatEntry
                     {
                         Protocol       = proto,
@@ -223,7 +227,7 @@ public class NetstatViewModel : ViewModelBase
                 else if (proto == "UDP" && parts.Length >= 4)
                 {
                     // UDP: Proto  LocalAddr  ForeignAddr  PID
-                    if (!int.TryParse(parts[^1], out int pid)) continue;
+                    if (!int.TryParse(parts[parts.Length - 1], out int pid)) continue;
                     entry = new NetstatEntry
                     {
                         Protocol       = proto,

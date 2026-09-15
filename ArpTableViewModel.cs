@@ -10,7 +10,7 @@ namespace LittlePinger.ViewModels;
 /// <summary>One row in the ARP cache.</summary>
 public class ArpEntry : ViewModelBase
 {
-    private string _name = "";
+    private string _name = "", _myName = "";
 
     public string IPAddress       { get; }
     public string PhysicalAddress { get; }
@@ -21,6 +21,13 @@ public class ArpEntry : ViewModelBase
     {
         get => _name;
         set => SetField(ref _name, value);
+    }
+
+    /// <summary>User-given name from the Ping list for this IP address, if any.</summary>
+    public string MyName
+    {
+        get => _myName;
+        set => SetField(ref _myName, value);
     }
 
     public ArpEntry(string ipAddress, string physicalAddress, string type)
@@ -41,6 +48,7 @@ public class ArpEntry : ViewModelBase
 /// </summary>
 public class ArpTableViewModel : ViewModelBase
 {
+    private readonly ObservableCollection<PingEntryViewModel> _pingEntries;
     private bool   _isRunning;
     private string _statusText = "";
 
@@ -51,8 +59,9 @@ public class ArpTableViewModel : ViewModelBase
     public RelayCommand RefreshCommand { get; }
     public RelayCommand ClearCommand   { get; }
 
-    public ArpTableViewModel()
+    public ArpTableViewModel(ObservableCollection<PingEntryViewModel> pingEntries)
     {
+        _pingEntries   = pingEntries;
         RefreshCommand = new RelayCommand(OnRefresh, () => !IsRunning);
         ClearCommand   = new RelayCommand(() => { Entries.Clear(); StatusText = ""; });
         OnRefresh();
@@ -81,7 +90,11 @@ public class ArpTableViewModel : ViewModelBase
                 Dispatch(() =>
                 {
                     Entries.Clear();
-                    foreach (var e in entries) Entries.Add(e);
+                    foreach (var e in entries)
+                    {
+                        ApplyMyName(e);
+                        Entries.Add(e);
+                    }
                     StatusText = $"{Entries.Count} entries — resolving names…";
                 });
 
@@ -115,6 +128,14 @@ public class ArpTableViewModel : ViewModelBase
             list.Add(new ArpEntry(ip, m.Groups[2].Value, m.Groups[3].Value));
         }
         return list;
+    }
+
+    private void ApplyMyName(ArpEntry entry)
+    {
+        var match = _pingEntries.FirstOrDefault(p =>
+            string.Equals(p.IpAddress, entry.IPAddress, StringComparison.OrdinalIgnoreCase));
+        if (match is not null && !string.IsNullOrWhiteSpace(match.Name))
+            entry.MyName = match.Name;
     }
 
     private static void Dispatch(Action a) => Application.Current.Dispatcher.Invoke(a);

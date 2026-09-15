@@ -123,7 +123,15 @@ public class SslInspectorViewModel : ViewModelBase
             using var tcp = new TcpClient();
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
             linked.CancelAfter(TimeSpan.FromSeconds(10));
-            await tcp.ConnectAsync(domain, port, linked.Token);
+            var connectTask = tcp.ConnectAsync(domain, port);
+            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(10), linked.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+            if (completed != connectTask)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                throw new TimeoutException("Connection timed out.");
+            }
+            await connectTask;
 
             // Accept any cert so we can inspect even self-signed/expired ones
             using var ssl = new SslStream(tcp.GetStream(), leaveInnerStreamOpen: false,
@@ -167,15 +175,18 @@ public class SslInspectorViewModel : ViewModelBase
                 new("Cipher Suite",       ssl.CipherAlgorithm.ToString()),
             };
 
-            var chainEntries = chain.ChainElements
-                .Select((el, i) => new CertChainEntry
+            var chainEntries = new List<CertChainEntry>();
+            for (int i = 0; i < chain.ChainElements.Count; i++)
+            {
+                var el = chain.ChainElements[i];
+                chainEntries.Add(new CertChainEntry
                 {
                     Index     = i,
                     SubjectCN = ExtractCN(el.Certificate.Subject),
                     IssuerCN  = ExtractCN(el.Certificate.Issuer),
                     ValidTo   = el.Certificate.NotAfter,
-                })
-                .ToList();
+                });
+            }
 
             Dispatch(() =>
             {

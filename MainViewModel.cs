@@ -147,7 +147,7 @@ public class MainViewModel : ViewModelBase
         ConnectivityVM  = new ConnectivityViewModel(Entries);
         MonitoringVM    = new MonitoringViewModel(Entries);
         ReportingVM     = new ReportingViewModel(Entries);
-        WifiNetworkVM   = new WifiNetworkViewModel();
+        WifiNetworkVM   = new WifiNetworkViewModel(Entries);
         SettingsVM      = new SettingsViewModel();
 
         Entries.CollectionChanged+= OnEntriesChanged;

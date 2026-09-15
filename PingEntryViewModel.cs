@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Windows;
 using System.Windows.Input;
@@ -15,6 +16,7 @@ public class PingEntryViewModel : ViewModelBase, IDisposable
 {
     private string _name = string.Empty;
     private string _ipAddress = string.Empty;
+    private string _netName = string.Empty;
     private int _interval = 1000;
     private int _timeout = 1000;
     private bool _isRunning;
@@ -38,6 +40,13 @@ public class PingEntryViewModel : ViewModelBase, IDisposable
     {
         get => _ipAddress;
         set => SetField(ref _ipAddress, value);
+    }
+
+    /// <summary>Network name resolved via reverse-DNS (or forward-DNS if host is a name). Empty while unresolved.</summary>
+    public string NetName
+    {
+        get => _netName;
+        private set => SetField(ref _netName, value);
     }
 
     /// <summary>Milliseconds to wait between successive ping attempts.</summary>
@@ -141,6 +150,7 @@ public class PingEntryViewModel : ViewModelBase, IDisposable
 
         IsRunning = true;
         _ = RunPingLoopAsync(_cts.Token);
+        _ = ResolveNetNameAsync();
     }
 
     /// <summary>
@@ -185,6 +195,28 @@ public class PingEntryViewModel : ViewModelBase, IDisposable
             }
         }
         catch (OperationCanceledException) { /* expected when Stop() is called */ }
+    }
+
+    /// <summary>
+    /// Resolves the network name for the current <see cref="IpAddress"/> via DNS
+    /// and sets <see cref="NetName"/> if a different name is found.
+    /// </summary>
+    private async Task ResolveNetNameAsync()
+    {
+        if (string.IsNullOrWhiteSpace(IpAddress)) return;
+        try
+        {
+            var entry = await Dns.GetHostEntryAsync(IpAddress);
+            var resolved = entry.HostName;
+            if (!string.IsNullOrWhiteSpace(resolved) &&
+                !string.Equals(resolved, IpAddress, StringComparison.OrdinalIgnoreCase))
+            {
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher != null)
+                    await dispatcher.InvokeAsync(() => NetName = resolved);
+            }
+        }
+        catch { /* DNS resolution not always available */ }
     }
 
     /// <summary>

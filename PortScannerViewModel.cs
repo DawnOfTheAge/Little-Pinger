@@ -320,7 +320,7 @@ public class PortScannerViewModel : ViewModelBase
     private async Task RunScan(string host, List<int> ports, CancellationToken ct)
     {
         // Verify host resolves before flooding with connect attempts
-        try   { await System.Net.Dns.GetHostEntryAsync(host, ct); }
+        try   { await System.Net.Dns.GetHostEntryAsync(host); }
         catch { Dispatch(() => { StatusText = $"Cannot resolve '{host}'."; IsRunning = false; }); return; }
 
         int total   = ports.Count;
@@ -375,7 +375,15 @@ public class PortScannerViewModel : ViewModelBase
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
             linked.CancelAfter(timeoutMs);
             using var client = new TcpClient();
-            await client.ConnectAsync(host, port, linked.Token);
+            var connectTask = client.ConnectAsync(host, port);
+            var timeoutTask = Task.Delay(timeoutMs, linked.Token);
+            var completed = await Task.WhenAny(connectTask, timeoutTask);
+            if (completed != connectTask)
+            {
+                linked.Token.ThrowIfCancellationRequested();
+                return false;
+            }
+            await connectTask;
             return true;
         }
         catch { return false; }

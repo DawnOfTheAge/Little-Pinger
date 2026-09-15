@@ -43,7 +43,7 @@ public class SpeedTestViewModel : ViewModelBase
     private double _uploadMbps;
     private bool   _hasUpload;
 
-    public IReadOnlyList<string> Servers { get; } = [.. ServerConfigs.Keys];
+    public IReadOnlyList<string> Servers { get; } = ServerConfigs.Keys.ToList();
 
     public string SelectedServer  { get => _selectedServer;  set => SetField(ref _selectedServer, value); }
     public bool   IsRunning       { get => _isRunning;       set { SetField(ref _isRunning, value); CommandManager.InvalidateRequerySuggested(); } }
@@ -164,7 +164,7 @@ public class SpeedTestViewModel : ViewModelBase
         response.EnsureSuccessStatusCode();
 
         var contentLength = response.Content.Headers.ContentLength ?? 0;
-        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        using var stream = await response.Content.ReadAsStreamAsync();
 
         var    sw         = Stopwatch.StartNew();
         var    lastUpdate = sw.Elapsed;
@@ -172,7 +172,7 @@ public class SpeedTestViewModel : ViewModelBase
         var    buffer     = new byte[131072]; // 128 KB
         int    read;
 
-        while ((read = await stream.ReadAsync(buffer, ct)) > 0)
+        while ((read = await stream.ReadAsync(buffer, 0, buffer.Length)) > 0)
         {
             total += read;
             var now     = sw.Elapsed;
@@ -197,7 +197,8 @@ public class SpeedTestViewModel : ViewModelBase
         http.Timeout = TimeSpan.FromSeconds(60);
 
         var data = new byte[uploadBytes];
-        Random.Shared.NextBytes(data);
+        var random = new Random();
+        random.NextBytes(data);
 
         onProgress?.Invoke(0, 0);
         var sw = Stopwatch.StartNew();

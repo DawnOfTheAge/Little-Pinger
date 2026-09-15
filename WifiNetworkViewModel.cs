@@ -12,10 +12,10 @@ public class WifiNetworkViewModel
     public LanScannerViewModel     LanScannerVM  { get; }
     public DhcpInspectorViewModel  DhcpVM        { get; }
 
-    public WifiNetworkViewModel()
+    public WifiNetworkViewModel(ObservableCollection<PingEntryViewModel> pingEntries)
     {
         WifiMonitorVM = new WifiMonitorViewModel();
-        LanScannerVM  = new LanScannerViewModel();
+        LanScannerVM  = new LanScannerViewModel(pingEntries);
         DhcpVM        = new DhcpInspectorViewModel();
     }
 }

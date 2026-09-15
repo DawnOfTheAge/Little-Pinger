@@ -3,6 +3,7 @@ using System.Windows.Input;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Reflection;
 using LittlePinger.ViewModels;
 
 namespace LittlePinger;
@@ -18,6 +19,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        var version = Assembly.GetEntryAssembly()?.GetName().Version
+            ?? new Version(1, 0, 0, 0);
+        Title = $"Little Pinger {version.ToString(4)}";
+
         _vm = new MainViewModel();
         DataContext = _vm;
 
@@ -149,8 +154,11 @@ public partial class MainWindow : Window
             if (!samples[i].HasValue) continue;
             double x = w * i / (n - 1);
             double y = h - samples[i]!.Value / 100.0 * (h - 4) - 2;
-            pts.Add(new System.Windows.Point(x, Math.Clamp(y, 0, h)));
+            pts.Add(new System.Windows.Point(x, Clamp(y, 0, h)));
         }
         line.Points = pts;
     }
+
+    private static double Clamp(double value, double min, double max)
+        => value < min ? min : value > max ? max : value;
 }

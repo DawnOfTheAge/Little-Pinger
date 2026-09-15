@@ -326,6 +326,10 @@
 
                         <DataGridTextColumn Header="Name"
                                             Binding="{Binding Name}"
+                                            Width="120" MinWidth="80"/>
+
+                        <DataGridTextColumn Header="Net Name"
+                                            Binding="{Binding NetName}"
                                             Width="*" MinWidth="100"/>
 
                         <DataGridTextColumn Header="Interval (ms)"
@@ -402,7 +406,10 @@
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="➕  Add Host" Command="{Binding AddHostCommand}"
                                         Style="{StaticResource ActionButton}" Background="#1565C0"
-                                        ToolTip="Add another host to ping in parallel"/>
+                                        ToolTip="Add another host to ping in parallel" Margin="0,0,4,0"/>
+                                <Button Content="🔄  Sync from Ping List" Command="{Binding SyncFromPingCommand}"
+                                        Style="{StaticResource ActionButton}" Background="#00695C"
+                                        ToolTip="Add and start all hosts from the main Ping tab"/>
                             </StackPanel>
                         </Border>
 
@@ -422,6 +429,19 @@
 
                                                 <!-- Toolbar -->
                                                 <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4">
+                                                    <!-- Running indicator dot -->
+                                                    <Ellipse Width="10" Height="10" VerticalAlignment="Center" Margin="0,0,6,0">
+                                                        <Ellipse.Style>
+                                                            <Style TargetType="Ellipse">
+                                                                <Setter Property="Fill" Value="#546E7A"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsRunning}" Value="True">
+                                                                        <Setter Property="Fill" Value="#4CAF50"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Ellipse.Style>
+                                                    </Ellipse>
                                                     <TextBlock Text="Host" VerticalAlignment="Center"
                                                                Foreground="#546E7A" FontWeight="SemiBold" Margin="0,0,6,0"/>
                                                     <ComboBox IsEditable="True"
@@ -506,8 +526,9 @@
                         </Grid.RowDefinitions>
 
                         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,8,8,4">
-                            <Button Content="▶ Start" Command="{Binding StartCommand}" Style="{StaticResource StartButton}"   Margin="0,0,4,0"/>
-                            <Button Content="■ Stop"  Command="{Binding StopCommand}"  Style="{StaticResource StopButton}"    Margin="0,0,4,0"/>
+                            <Button Content="▶ Start"   Command="{Binding StartCommand}"   Style="{StaticResource StartButton}"   Margin="0,0,4,0"/>
+                            <Button Content="■ Stop"    Command="{Binding StopCommand}"    Style="{StaticResource StopButton}"    Margin="0,0,4,0"/>
+                            <Button Content="🔄 Refresh" Command="{Binding RefreshCommand}" Style="{StaticResource RefreshButton}" Margin="0,0,8,0"/>
                             <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#90A4AE" Margin="8,0,0,0"/>
                         </StackPanel>
 
@@ -515,14 +536,28 @@
                                   IsReadOnly="True" Background="#1A2330" RowBackground="#1E2A30"
                                   AlternatingRowBackground="#1A2430" Foreground="#ECEFF1"
                                   BorderBrush="#37474F" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
-                                  ColumnHeaderHeight="28" Margin="8,0,8,4">
+                                  ColumnHeaderHeight="28" Margin="8,0,8,4"
+                                  Tag="{Binding DataContext, ElementName=RootWindow}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Add IPv4 to Ping List"
+                                              Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                                RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem.PingTarget,
+                                                                          RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Interface"  Binding="{Binding Name}"           Width="220"/>
-                                <DataGridTextColumn Header="↓ Rx/s"    Binding="{Binding RxPerSecDisplay}" Width="90"/>
-                                <DataGridTextColumn Header="↑ Tx/s"    Binding="{Binding TxPerSecDisplay}" Width="90"/>
-                                <DataGridTextColumn Header="Total Rx"  Binding="{Binding TotalRxDisplay}"  Width="110"/>
-                                <DataGridTextColumn Header="Total Tx"  Binding="{Binding TotalTxDisplay}"  Width="110"/>
-                                <DataGridTextColumn Header="Status"    Binding="{Binding Status}"          Width="*"/>
+                                <DataGridTextColumn Header="Interface"  Binding="{Binding Name}"       Width="180"/>
+                                <DataGridTextColumn Header="Status"     Binding="{Binding Status}"     Width="80"/>
+                                <DataGridTextColumn Header="Type"       Binding="{Binding Type}"       Width="110"/>
+                                <DataGridTextColumn Header="IPv4"       Binding="{Binding IPv4}"       Width="120"/>
+                                <DataGridTextColumn Header="MAC"        Binding="{Binding MacAddress}" Width="140"/>
+                                <DataGridTextColumn Header="Speed"      Binding="{Binding Speed}"      Width="80"/>
+                                <DataGridTextColumn Header="↓ Rx/s"    Binding="{Binding RxPerSec}"   Width="90"/>
+                                <DataGridTextColumn Header="↑ Tx/s"    Binding="{Binding TxPerSec}"   Width="90"/>
+                                <DataGridTextColumn Header="Total Rx"  Binding="{Binding TotalRx}"    Width="110"/>
+                                <DataGridTextColumn Header="Total Tx"  Binding="{Binding TotalTx}"    Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -564,6 +599,7 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="IP Address"  Binding="{Binding IPAddress}" Width="160"/>
                                 <DataGridTextColumn Header="MAC Address" Binding="{Binding PhysicalAddress}" Width="160"/>
+                                <DataGridTextColumn Header="My Name"     Binding="{Binding MyName}" Width="140"/>
                                 <DataGridTextColumn Header="Name"        Binding="{Binding Name}" Width="200"/>
                                 <DataGridTextColumn Header="Type"        Binding="{Binding Type}" Width="*"/>
                             </DataGrid.Columns>
@@ -850,9 +886,10 @@
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="IP Address"  Binding="{Binding IP}"         Width="140"/>
-                                <DataGridTextColumn Header="MAC"         Binding="{Binding MAC}"        Width="150"/>
-                                <DataGridTextColumn Header="Hostname"    Binding="{Binding Hostname}"   Width="200"/>
+                                <DataGridTextColumn Header="IP Address"  Binding="{Binding IP}"         Width="130"/>
+                                <DataGridTextColumn Header="MAC"         Binding="{Binding MAC}"        Width="140"/>
+                                <DataGridTextColumn Header="My Name"     Binding="{Binding MyName}"     Width="120"/>
+                                <DataGridTextColumn Header="Hostname"    Binding="{Binding Hostname}"   Width="190"/>
                                 <DataGridTextColumn Header="Response"    Binding="{Binding ResponseMs}" Width="90"/>
                                 <DataGridTextColumn Header="Status"      Binding="{Binding Status}"     Width="*"/>
                             </DataGrid.Columns>
@@ -1016,6 +1053,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>   <!-- toolbar -->
                     <RowDefinition Height="*"/>      <!-- grid -->
+                    <RowDefinition Height="Auto"/>   <!-- status bar -->
                 </Grid.RowDefinitions>
 
                 <!-- Toolbar -->
@@ -1024,7 +1062,40 @@
                         <Button Content="🔄  Refresh"
                                 Command="{Binding IPConfigVM.RefreshCommand}"
                                 Background="#1E88E5"
-                                Padding="12,5"
+                                Padding="12,5" Margin="0,0,6,0"
+                                Style="{StaticResource ActionButton}"/>
+                        <Separator Background="#607D8B" Width="1" Margin="4,2"/>
+                        <Button Content="▶  Enable"
+                                Command="{Binding IPConfigVM.EnableCommand}"
+                                Background="#43A047"
+                                Padding="12,5" Margin="6,0,4,0"
+                                ToolTip="Enable the selected network adapter (requires admin)"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="⏹  Disable"
+                                Command="{Binding IPConfigVM.DisableCommand}"
+                                Background="#FB8C00"
+                                Padding="12,5" Margin="0,0,4,0"
+                                ToolTip="Disable the selected network adapter (requires admin)"
+                                Style="{StaticResource ActionButton}"/>
+                        <Separator Background="#607D8B" Width="1" Margin="4,2"/>
+                        <Button Content="ℹ  Status"
+                                Command="{Binding IPConfigVM.ShowStatusCommand}"
+                                Background="#039BE5"
+                                Padding="12,5" Margin="6,0,4,0"
+                                ToolTip="Show detailed status of the selected adapter"
+                                Style="{StaticResource ActionButton}"/>
+                        <Button Content="🔧  Properties"
+                                Command="{Binding IPConfigVM.PropertiesCommand}"
+                                Background="#546E7A"
+                                Padding="12,5" Margin="0,0,4,0"
+                                ToolTip="Open Windows Network Connections panel"
+                                Style="{StaticResource ActionButton}"/>
+                        <Separator Background="#607D8B" Width="1" Margin="4,2"/>
+                        <Button Content="🗑  Delete"
+                                Command="{Binding IPConfigVM.DeleteCommand}"
+                                Background="#E53935"
+                                Padding="12,5" Margin="6,0,0,0"
+                                ToolTip="Uninstall (permanently remove) the selected adapter — requires admin"
                                 Style="{StaticResource ActionButton}"/>
                     </StackPanel>
                 </Border>
@@ -1032,6 +1103,7 @@
                 <!-- Interfaces DataGrid -->
                 <DataGrid Grid.Row="1"
                           ItemsSource="{Binding IPConfigVM.Interfaces}"
+                          SelectedItem="{Binding IPConfigVM.SelectedInterface}"
                           AutoGenerateColumns="False"
                           IsReadOnly="True"
                           SelectionMode="Single"
@@ -1044,7 +1116,23 @@
                           BorderThickness="0"
                           HeadersVisibility="Column"
                           VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Auto">
+                          HorizontalScrollBarVisibility="Auto"
+                          Tag="{Binding DataContext, ElementName=RootWindow}">
+
+                    <DataGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Ping IPv4 Address"
+                                      Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem.IPv4PingTarget,
+                                                                  RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            <MenuItem Header="Ping Gateway"
+                                      Command="{Binding PlacementTarget.Tag.AddToPingListCommand,
+                                                        RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                      CommandParameter="{Binding PlacementTarget.SelectedItem.GatewayPingTarget,
+                                                                  RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                        </ContextMenu>
+                    </DataGrid.ContextMenu>
 
                     <DataGrid.Columns>
 
@@ -1082,6 +1170,11 @@
 
                     </DataGrid.Columns>
                 </DataGrid>
+
+                <!-- Status bar -->
+                <Border Grid.Row="2" Background="#ECEFF1" BorderBrush="#CFD8DC" BorderThickness="0,1,0,0" Padding="12,4">
+                    <TextBlock Text="{Binding IPConfigVM.ActionStatus}" Foreground="#546E7A" FontSize="11.5"/>
+                </Border>
             </Grid>
         </TabItem>
 
@@ -2452,13 +2545,14 @@
                                   GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#2A3540"
                                   ColumnHeaderHeight="28" Margin="8,0,8,4">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="Name"       Binding="{Binding Name}"              Width="120"/>
-                                <DataGridTextColumn Header="Host"       Binding="{Binding Host}"              Width="160"/>
-                                <DataGridTextColumn Header="Type"       Binding="{Binding TestType}"          Width="70"/>
-                                <DataGridTextColumn Header="Port"       Binding="{Binding Port}"              Width="55"/>
-                                <DataGridTextColumn Header="Every"      Binding="{Binding IntervalMinutes}"   Width="55"/>
-                                <DataGridTextColumn Header="Last Run"   Binding="{Binding LastRunDisplay}"    Width="100"/>
-                                <DataGridTextColumn Header="Result"     Binding="{Binding LastStatus}"        Width="*"/>
+                                <DataGridTextColumn Header="Name"          Binding="{Binding Name}"              Width="120"/>
+                                <DataGridTextColumn Header="Host"          Binding="{Binding Host}"              Width="150"/>
+                                <DataGridTextColumn Header="Hostname"      Binding="{Binding ResolvedHost}"      Width="150"/>
+                                <DataGridTextColumn Header="Type"          Binding="{Binding TestType}"          Width="70"/>
+                                <DataGridTextColumn Header="Port"          Binding="{Binding Port}"              Width="55"/>
+                                <DataGridTextColumn Header="Every"         Binding="{Binding IntervalMinutes}"   Width="55"/>
+                                <DataGridTextColumn Header="Last Run"      Binding="{Binding LastRunDisplay}"    Width="100"/>
+                                <DataGridTextColumn Header="Result"        Binding="{Binding LastStatus}"        Width="*"/>
                             </DataGrid.Columns>
                         </DataGrid>
 

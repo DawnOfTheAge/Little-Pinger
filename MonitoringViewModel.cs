@@ -18,7 +18,7 @@ public class MonitoringViewModel
     {
         ContinuousPingVM   = new ContinuousPingViewModel(pingEntries);
         InterfaceMonitorVM = new NetworkInterfaceMonitorViewModel();
-        ArpTableVM         = new ArpTableViewModel();
+        ArpTableVM         = new ArpTableViewModel(pingEntries);
         RouteTableVM       = new RouteTableViewModel();
     }
 }

@@ -138,16 +138,30 @@ public class WhoisLookupViewModel : ViewModelBase
         linked.CancelAfter(TimeSpan.FromSeconds(15));
 
         using var tcp = new TcpClient();
-        await tcp.ConnectAsync(server, 43, linked.Token);
+        var connectTask = tcp.ConnectAsync(server, 43);
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(15), linked.Token);
+        var completed = await Task.WhenAny(connectTask, timeoutTask);
+        if (completed != connectTask)
+        {
+            linked.Token.ThrowIfCancellationRequested();
+            throw new TimeoutException("WHOIS connection timed out.");
+        }
         tcp.ReceiveTimeout = 15_000;
 
-        await using var stream = tcp.GetStream();
+        using var stream = tcp.GetStream();
         var queryBytes = Encoding.ASCII.GetBytes(query + "\r\n");
-        await stream.WriteAsync(queryBytes, linked.Token);
+        await stream.WriteAsync(queryBytes, 0, queryBytes.Length, linked.Token);
 
         using var reader = new StreamReader(stream, Encoding.UTF8,
             detectEncodingFromByteOrderMarks: true, bufferSize: 65536, leaveOpen: true);
-        return await reader.ReadToEndAsync(linked.Token);
+        var readTask = reader.ReadToEndAsync();
+        completed = await Task.WhenAny(readTask, timeoutTask);
+        if (completed != readTask)
+        {
+            linked.Token.ThrowIfCancellationRequested();
+            throw new TimeoutException("WHOIS query timed out.");
+        }
+        return await readTask;
     }
 
     private static string? ParseReferServer(string response)
@@ -158,7 +172,7 @@ public class WhoisLookupViewModel : ViewModelBase
             foreach (var prefix in new[] { "refer:", "whois:" })
                 if (line.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    var val = line[prefix.Length..].Trim();
+                    var val = line.Substring(prefix.Length).Trim();
                     if (!string.IsNullOrEmpty(val)) return val;
                 }
         }

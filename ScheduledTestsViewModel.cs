@@ -18,6 +18,7 @@ public class ScheduledTest : ViewModelBase
 {
     private string            _name            = "New Test";
     private string            _host            = "";
+    private string            _resolvedHost    = "";
     private ScheduledTestType _testType        = ScheduledTestType.Ping;
     private int               _port            = 80;
     private int               _intervalMinutes = 5;
@@ -28,7 +29,8 @@ public class ScheduledTest : ViewModelBase
 
     public Guid              Id              { get; init; } = Guid.NewGuid();
     public string            Name            { get => _name;            set => SetField(ref _name, value); }
-    public string            Host            { get => _host;            set => SetField(ref _host, value); }
+    public string            Host            { get => _host;            set { SetField(ref _host, value); ResolvedHost = ""; } }
+    public string            ResolvedHost    { get => _resolvedHost;    set => SetField(ref _resolvedHost, value); }
     public ScheduledTestType TestType        { get => _testType;        set => SetField(ref _testType, value); }
     public int               Port            { get => _port;            set => SetField(ref _port, value); }
     public int               IntervalMinutes { get => _intervalMinutes; set => SetField(ref _intervalMinutes, value); }
@@ -87,7 +89,7 @@ public class ScheduledTestsViewModel : ViewModelBase
 
     public ObservableCollection<ScheduledTest>  Tests    { get; } = new();
     public ObservableCollection<string>         AllHosts { get; } = new();
-    public static IReadOnlyList<string>         TestTypes => Enum.GetNames<ScheduledTestType>();
+    public static IReadOnlyList<string>         TestTypes => Enum.GetNames(typeof(ScheduledTestType));
 
     public ScheduledTest? Selected
     {
@@ -108,7 +110,16 @@ public class ScheduledTestsViewModel : ViewModelBase
 
     public string            Alerts             { get => _alerts;             set => SetField(ref _alerts, value); }
     public string            EditName           { get => _editName;           set => SetField(ref _editName, value); }
-    public string            EditHost           { get => _editHost;           set { SetField(ref _editHost, value); CommandManager.InvalidateRequerySuggested(); } }
+    public string            EditHost
+    {
+        get => _editHost;
+        set
+        {
+            SetField(ref _editHost, value);
+            CommandManager.InvalidateRequerySuggested();
+            AutoPopulateEditName();
+        }
+    }
     public ScheduledTestType EditType           { get => _editType;           set => SetField(ref _editType, value); }
     public int               EditPort           { get => _editPort;           set => SetField(ref _editPort, value); }
     public int               EditIntervalMinutes{ get => _editIntervalMinutes; set => SetField(ref _editIntervalMinutes, value); }
@@ -165,6 +176,19 @@ public class ScheduledTestsViewModel : ViewModelBase
                 AllHosts.Add(e.IpAddress);
     }
 
+    /// <summary>
+    /// When <see cref="EditHost"/> matches a ping-list entry that has a user-defined name,
+    /// pre-fills <see cref="EditName"/> with that name (only when EditName is blank).
+    /// </summary>
+    private void AutoPopulateEditName()
+    {
+        if (string.IsNullOrWhiteSpace(_editHost)) return;
+        var match = _pingEntries.FirstOrDefault(p =>
+            string.Equals(p.IpAddress, _editHost, StringComparison.OrdinalIgnoreCase));
+        if (match is not null && !string.IsNullOrWhiteSpace(match.Name))
+            EditName = match.Name;
+    }
+
     // ── CRUD ─────────────────────────────────────────────────────────────────
 
     private void OnAdd()
@@ -180,6 +204,7 @@ public class ScheduledTestsViewModel : ViewModelBase
         };
         Tests.Add(t);
         Selected = t;
+        _ = ResolveHostNameAsync(t);
         Save();
     }
 
@@ -192,6 +217,7 @@ public class ScheduledTestsViewModel : ViewModelBase
         Selected.Port            = EditPort;
         Selected.IntervalMinutes = EditIntervalMinutes;
         Selected.AlertOnFailure  = EditAlertOnFailure;
+        _ = ResolveHostNameAsync(Selected);
         Save();
     }
 
@@ -235,7 +261,11 @@ public class ScheduledTestsViewModel : ViewModelBase
                 _                     => await RunPingTestAsync(test.Host)
             };
         }
-        catch (Exception ex) { status = $"ERROR: {ex.Message[..Math.Min(60, ex.Message.Length)]}"; }
+        catch (Exception ex)
+        {
+            var message = ex.Message;
+            status = $"ERROR: {message.Substring(0, Math.Min(60, message.Length))}";
+        }
 
         Dispatch(() =>
         {
@@ -269,7 +299,15 @@ public class ScheduledTestsViewModel : ViewModelBase
         using var tcp  = new TcpClient();
         using var cts  = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        await tcp.ConnectAsync(host, port, cts.Token);
+        var connectTask = tcp.ConnectAsync(host, port);
+        var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5), cts.Token);
+        var completed = await Task.WhenAny(connectTask, timeoutTask);
+        if (completed != connectTask)
+        {
+            cts.Token.ThrowIfCancellationRequested();
+            throw new TimeoutException("Connection timed out.");
+        }
+        await connectTask;
         sw.Stop();
         return $"OPEN  {sw.ElapsedMilliseconds} ms";
     }
@@ -283,7 +321,12 @@ public class ScheduledTestsViewModel : ViewModelBase
         {
             var list = JsonSerializer.Deserialize<List<ScheduledTestDto>>(File.ReadAllText(DataFile));
             if (list is null) return;
-            foreach (var dto in list) Tests.Add(ScheduledTest.FromDto(dto));
+            foreach (var dto in list)
+            {
+                var t = ScheduledTest.FromDto(dto);
+                Tests.Add(t);
+                _ = ResolveHostNameAsync(t);
+            }
         }
         catch { /* corrupt file — start fresh */ }
     }
@@ -296,6 +339,26 @@ public class ScheduledTestsViewModel : ViewModelBase
             File.WriteAllText(DataFile, JsonSerializer.Serialize(Tests.Select(t => t.ToDto()).ToList(), Opts));
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Attempts DNS resolution for <paramref name="test"/> and sets
+    /// <see cref="ScheduledTest.ResolvedHost"/> if a different name is found.
+    /// </summary>
+    private static async Task ResolveHostNameAsync(ScheduledTest test)
+    {
+        if (string.IsNullOrWhiteSpace(test.Host)) return;
+        try
+        {
+            var entry    = await System.Net.Dns.GetHostEntryAsync(test.Host);
+            var resolved = entry.HostName;
+            if (!string.IsNullOrWhiteSpace(resolved) &&
+                !string.Equals(resolved, test.Host, StringComparison.OrdinalIgnoreCase))
+            {
+                Dispatch(() => test.ResolvedHost = resolved);
+            }
+        }
+        catch { /* DNS resolution not always available */ }
     }
 
     private static void Dispatch(Action a) => Application.Current.Dispatcher.Invoke(a);

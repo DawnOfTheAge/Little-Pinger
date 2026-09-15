@@ -14,11 +14,12 @@ namespace LittlePinger.ViewModels;
 /// <summary>One discovered device on the local subnet.</summary>
 public class LanDevice : ViewModelBase
 {
-    private string _ip = "", _mac = "—", _hostname = "—", _responseMs = "—", _status = "Scanning…";
+    private string _ip = "", _mac = "—", _hostname = "—", _myName = "", _responseMs = "—", _status = "Scanning…";
 
     public string IP         { get => _ip;         set => SetField(ref _ip, value); }
     public string MAC        { get => _mac;         set => SetField(ref _mac, value); }
     public string Hostname   { get => _hostname;    set => SetField(ref _hostname, value); }
+    public string MyName     { get => _myName;      set => SetField(ref _myName, value); }
     public string ResponseMs { get => _responseMs;  set => SetField(ref _responseMs, value); }
     public string Status     { get => _status;      set => SetField(ref _status, value); }
     public bool   IsOnline   => Status == "Online";
@@ -34,6 +35,7 @@ public class LanDevice : ViewModelBase
 /// </summary>
 public class LanScannerViewModel : ViewModelBase
 {
+    private readonly ObservableCollection<PingEntryViewModel> _pingEntries;
     private CancellationTokenSource? _cts;
     private bool   _isRunning;
     private int    _progressPercent;
@@ -71,17 +73,19 @@ public class LanScannerViewModel : ViewModelBase
     public RelayCommand CancelCommand { get; }
     public RelayCommand ClearSearchCommand { get; }
 
-    public LanScannerViewModel()
+    public LanScannerViewModel(ObservableCollection<PingEntryViewModel> pingEntries)
     {
+        _pingEntries    = pingEntries;
         FilteredDevices = CollectionViewSource.GetDefaultView(Devices);
         FilteredDevices.Filter = obj =>
         {
             if (string.IsNullOrWhiteSpace(_searchText)) return true;
             if (obj is not LanDevice d) return false;
             var q = _searchText.Trim();
-            return d.IP.Contains(q, StringComparison.OrdinalIgnoreCase)
-                || d.MAC.Contains(q, StringComparison.OrdinalIgnoreCase)
-                || d.Hostname.Contains(q, StringComparison.OrdinalIgnoreCase);
+            return d.IP.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                || d.MAC.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                || d.Hostname.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0
+                || d.MyName.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
         };
 
         // Re-evaluate FilteredCount whenever devices are added/removed
@@ -169,6 +173,7 @@ public class LanScannerViewModel : ViewModelBase
                 foreach (var dev in Devices)
                 {
                     if (arps.TryGetValue(dev.IP, out var mac)) dev.MAC = mac;
+                    ApplyMyName(dev);
                 }
                 StatusText = $"Found {Devices.Count} online device(s)  ·  Scan complete";
             });
@@ -202,8 +207,8 @@ public class LanScannerViewModel : ViewModelBase
             {
                 UseShellExecute = false, RedirectStandardOutput = true, CreateNoWindow = true
             };
-            await using var stream = Process.Start(psi)!.StandardOutput.BaseStream;
-            using var reader = new System.IO.StreamReader(stream);
+            using var process = Process.Start(psi)!;
+            using var reader = new System.IO.StreamReader(process.StandardOutput.BaseStream);
             var output = await reader.ReadToEndAsync();
             var rx = new Regex(@"^\s*([\d.]+)\s+([0-9a-fA-F-]{17})", RegexOptions.Multiline);
             foreach (Match m in rx.Matches(output))
@@ -232,6 +237,14 @@ public class LanScannerViewModel : ViewModelBase
     }
 
     private void OnCancel() => _cts?.Cancel();
+
+    private void ApplyMyName(LanDevice dev)
+    {
+        var match = _pingEntries.FirstOrDefault(p =>
+            string.Equals(p.IpAddress, dev.IP, StringComparison.OrdinalIgnoreCase));
+        if (match is not null && !string.IsNullOrWhiteSpace(match.Name))
+            dev.MyName = match.Name;
+    }
 
     private static uint IpToUint(IPAddress ip)
     {
